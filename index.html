@@ -5023,7 +5023,7 @@ function openAvatarUpload(){
 }
 
 function handleAvatarUpload(event){
-  const file=event.target.(files&&files[0]);
+  const file=event.target.files[0];
   if(!file||!me) return;
   const reader=new FileReader();
   reader.onload=e=>{
@@ -6259,9 +6259,9 @@ function showArchiveModal(){
               <span style="font-size:10px;color:var(--muted);">${new Date(arch.archivedAt).toLocaleDateString('ar-IQ')}</span>
             </div>
             <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);">
-              <span>✅ ${arch.(tasks&&tasks.length)||0} مهمة</span>
-              <span>👥 ${arch.(attendance&&attendance.length)||0} حضور</span>
-              <span>📦 ${arch.(deliveries&&deliveries.length)||0} تسليم</span>
+              <span>✅ ${(arch.tasks&&arch.tasks.length)||0} مهمة</span>
+              <span>👥 ${(arch.attendance&&arch.attendance.length)||0} حضور</span>
+              <span>📦 ${(arch.deliveries&&arch.deliveries.length)||0} تسليم</span>
             </div>
           </div>`;
         }).join('')}
@@ -7274,7 +7274,7 @@ function changeMat(key, delta){
   const el=document.getElementById('mat_'+key);
   if(el){
     el.textContent=MAT_STORE[key];
-    const row=el.(parentElement&&parentElement.parentElement);
+    const row=(el.parentElement&&el.parentElement.parentElement);
     if(row) row.style.borderColor=MAT_STORE[key]>0?'rgba(14,165,233,.4)':'var(--border)';
   }
   buildMatsString();
@@ -7294,7 +7294,7 @@ function resetMaterials(){
     const el=document.getElementById('mat_'+k);
     if(el){
       el.textContent='0';
-      const row=el.(parentElement&&parentElement.parentElement);
+      const row=(el.parentElement&&el.parentElement.parentElement);
       if(row) row.style.borderColor='var(--border)';
     }
   });
@@ -8221,7 +8221,7 @@ function openTaskDetails(id){
   document.getElementById('tdSentAt').textContent=fmtHM(t.sentAt);
   document.getElementById('tdDur').textContent=t.estimatedDuration>0?(t.estimatedDuration>=60?Math.floor(t.estimatedDuration/60)+'س'+(t.estimatedDuration%60>0?' '+t.estimatedDuration%60+'د':''):t.estimatedDuration+'د'):'غير محدد';
   document.getElementById('tdFee').textContent=t.fee>0?iqd(t.fee):'—';
-  document.getElementById('tdTech').textContent=t.(teamNames&&teamNames.length)>1?t.teamNames.join(' + '):t.techName||'—';
+  document.getElementById('tdTech').textContent=(t.teamNames&&t.teamNames.length)>1?t.teamNames.join(' + '):t.techName||'—';
   document.getElementById('tdCreator').textContent=t.createdBy||'الأدمن';
   // Phone
   const pw=document.getElementById('tdPhoneWrap');
@@ -9228,7 +9228,7 @@ function changeDlv(key,delta){
   const el=document.getElementById('dlv_'+key);
   if(el){
     el.textContent=DLV_STORE[key];
-    const row=el.(parentElement&&parentElement.parentElement);
+    const row=(el.parentElement&&el.parentElement.parentElement);
     if(row) row.style.borderColor=DLV_STORE[key]>0?'rgba(14,165,233,.4)':'var(--border)';
   }
 }
@@ -9259,7 +9259,7 @@ function initDeliveryPage(){
     const el=document.getElementById('dlv_'+k);
     if(el){
       el.textContent='0';
-      const row=el.(parentElement&&parentElement.parentElement);
+      const row=(el.parentElement&&el.parentElement.parentElement);
       if(row) row.style.borderColor='var(--border)';
     }
   });
@@ -9317,7 +9317,7 @@ function submitDelivery(){
     const el=document.getElementById('dlv_'+k);
     if(el){
       el.textContent='0';
-      const row=el.(parentElement&&parentElement.parentElement);
+      const row=(el.parentElement&&el.parentElement.parentElement);
       if(row) row.style.borderColor='var(--border)';
     }
   });
