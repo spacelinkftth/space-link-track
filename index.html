@@ -6494,6 +6494,7 @@ function submitLeaveRequest(){
   };
   leaveRequests.push(req);
   sbSaveKey('leaveRequests',leaveRequests);
+  const dateLabel=dateTo&&dateTo!==date
     ? new Date(date).toLocaleDateString('ar-IQ')+' — '+new Date(dateTo).toLocaleDateString('ar-IQ')+' ('+days+' أيام)'
     : new Date(date).toLocaleDateString('ar-IQ');
   const timeLabel=timeStr?' ('+timeStr+')':'';
@@ -8849,7 +8850,7 @@ function renderCustomerHistory(query){
   const doneTasks=tasks.filter(t=>t.status==='done');
 
   // Get all unique customer names from task descriptions
-  const allNames=[[].concat(new) Set(doneTasks.map(t=>t.desc).filter(Boolean))];
+  const allNames=Array.from(new Set(doneTasks.map(t=>t.desc).filter(Boolean)));
 
   let html=`
   <!-- Search box -->
@@ -9094,7 +9095,7 @@ function loadInventory(){
     const s=localStorage.getItem('slt_inventory');
     if(s) Object.assign(inventory, JSON.parse(s));
     const h=localStorage.getItem('slt_inv_history');
-    if(h) invHistory.push([].concat(JSON).parse(h));
+    if(h) invHistory.push(JSON.parse(h));
   }catch(e){}
 }
 loadInventory();
@@ -9461,7 +9462,7 @@ function renderDeliverySummary(){
     });
   });
 
-  const techIds=[[].concat(new) Set([[].concat(Object).keys(delivered).concat(Object.keys(used))].map(Number))];
+  const techIds=Array.from(new Set(Object.keys(delivered).concat(Object.keys(used)).map(Number)));
 
   if(techIds.length===0){
     el.innerHTML=`<div style="text-align:center;padding:18px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:12px;">لا توجد بيانات اليوم</div>`;
