@@ -2692,7 +2692,7 @@ function tickShift(){
   elapsed++;
 
   // Check auto-logout based on custom shift end time + 30 min grace
-  const customShift=window.(_customShifts&&_customShifts[(me&&me.id)]);
+  const customShift=(window._customShifts&&window._customShifts[(me&&me.id)]);
   if(customShift&&customShift.end){
     const now=new Date();
     const [eh,em]=customShift.end.split(':').map(Number);
@@ -3130,7 +3130,7 @@ function renderList(){
     return `<div class="ecard" style="color:${t.color}" id="ec${t.id}" onclick="focusTech(${t.id})">
       <div class="ec-top">
         <div class="ec-av" style="background:${t.color}">${t.short}</div>
-        <div class="ec-info"><div class="ec-name">${t.name} ${gradeBadge(((TECHS.find(x=>x.id===t.id))||\{\}.grade)||'B')}</div><div class="ec-role">فني</div></div>
+        <div class="ec-info"><div class="ec-name">${t.name} ${gradeBadge(((TECHS.find(x=>x.id===t.id)||{}).grade)||'B')}</div><div class="ec-role">فني</div></div>
         <div class="ec-badge" style="color:${t.onBreak?'var(--amber)':t.color}">${t.onBreak?'☕ استراحة':'✅ نشط'}</div>
       </div>
       ${t.onBreak?`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;">
@@ -3537,7 +3537,7 @@ function renderDeferredList(){
   if(done.length>0||cancelled.length>0){
     html+=`<div style="margin-top:16px;">
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">السجل</div>
-      ${[...done,...cancelled].sort((a,b)=>b.createdAt-a.createdAt).map(d=>`
+      ${done.concat(cancelled).sort((a,b)=>b.createdAt-a.createdAt).map(d=>`
       <div style="padding:9px 14px;background:var(--card);border:1px solid var(--border);border-radius:9px;margin-bottom:6px;display:flex;align-items:center;gap:8px;opacity:.6;">
         <span style="font-size:14px;">${defTypeIcons[d.type]||'📋'}</span>
         <div style="flex:1;font-size:11px;">
@@ -3645,7 +3645,7 @@ let hrTab='daily';
 // Called when tech logs in — auto-record attendance
 function hrRecordLogin(techId, loginTime){
   const shift=SHIFTS[techId];
-  const customShift=window.(_customShifts&&_customShifts[techId]);
+  const customShift=(window._customShifts&&window._customShifts[techId]);
   const shiftData=customShift||shift;
   if(!shiftData) return;
   const today=loginTime.toLocaleDateString('ar-IQ');
@@ -3657,7 +3657,7 @@ function hrRecordLogin(techId, loginTime){
   const lateMin=Math.max(0,loginMin-startMin);
   hrAttendance.push({
     techId,
-    name:shiftData.name||((TECHS.find(t=>t.id===techId))||\{\}.name)||'',
+    name:shiftData.name||((TECHS.find(t=>t.id===techId)||{}).name)||'',
     date:today,
     loginTime:fmtHM(loginTime),
     logoutTime:'—',
@@ -3832,7 +3832,7 @@ function renderLeaveList(){
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:9px 14px;background:var(--s1);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;">
       <span>الفني</span><span>النوع</span><span>التاريخ</span><span>ملاحظة</span>
     </div>
-    ${[...hrLeaves].reverse().map(l=>`
+    ${hrLeaves.slice().reverse().map(l=>`
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:10px 14px;border-bottom:1px solid var(--border);align-items:center;">
       <span style="font-size:12px;font-weight:700;">${l.name}</span>
       <span style="font-size:11px;font-weight:700;color:${typeC[l.type]||'var(--muted)'};">${typeIc[l.type]||''} ${l.type}</span>
@@ -4371,8 +4371,8 @@ function renderSalaryTable(){
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">📋 سجل الخصومات والسحوبات</div>
     ${(()=>{
       const allEntries=[
-        ...myDeds.map(d=>({...d, type:'ded'})),
-        ...withdrawals.filter(w=>w.techId===tid).map(w=>({...w, type:'wd', reason:'💵 سحب'}))
+        [].concat(myDeds).map(d=>(Object.assign({},d,{type:'ded'}))),
+        [].concat(withdrawals).filter(w=>w.techId===tid).map(w=>(Object.assign({},w,{type:'wd', reason:'💵 سحب'})))
       ].sort((a,b)=>new Date(a.date)-new Date(b.date));
       if(allEntries.length===0) return `<div style="text-align:center;padding:24px;background:var(--card);border:1px solid var(--border);border-radius:11px;color:var(--muted);font-size:13px;">✅ لا توجد خصومات أو سحوبات</div>`;
       let r=base;
@@ -4893,7 +4893,7 @@ function registerNewStaff(){
   if(Object.values(TECH_PASS).includes(pass)){showErr('هذا الباسورد مستخدم — اختر باسورد آخر');return;}
 
   // Generate new ID
-  const maxId=Math.max(...TECHS.map(t=>t.id), 27);
+  const maxId=Math.max.apply(null,TECHS.map(t=>t.id), 27);
   const newId=maxId+1;
 
   // Add to TECHS
@@ -5130,7 +5130,7 @@ function getEffectivePerms(techId){
   const role=ADMIN_IDS.includes(techId)?'admin':SUPERVISOR_IDS.includes(techId)?'supervisor':'tech';
   const defaults=getDefaultPerms(role, techId);
   const custom=userPermissions[techId]||{};
-  return {...defaults,...custom};
+  return Object.assign({},defaults,custom);
 }
 
 function openPermissionsModal(){
@@ -5243,7 +5243,7 @@ function openShiftEditModal(){
 
   list.innerHTML=TECHS.map(t=>{
     // Get current shift — saved > custom > default SHIFTS
-    const cur=savedShifts[t.id]||window.(_customShifts&&_customShifts[t.id])||SHIFTS[t.id]||{start:'12:00',end:'00:00'};
+    const cur=savedShifts[t.id]||(window._customShifts&&_customShifts[t.id])||SHIFTS[t.id]||{start:'12:00',end:'00:00'};
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:11px 14px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
         <div style="width:28px;height:28px;border-radius:7px;background:${t.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0;">${t.short}</div>
@@ -5418,7 +5418,7 @@ function openAlertModal(){
   list.innerHTML='';
   _alertTargets=[];
   // All active techs + supervisors
-  const all=[...TECHS.filter(t=>t.dept!=='متابعة')];
+  const all=TECHS.filter(t=>t.dept!=='متابعة').slice();
   all.forEach(t=>{
     const div=document.createElement('div');
     div.id='alrt_'+t.id;
@@ -6575,7 +6575,7 @@ function renderLeaveRequestsAdmin(){
   const stColor={pending:'var(--amber)',approved:'var(--green)',rejected:'var(--red)'};
   const stLabel={pending:'⏳ انتظار',approved:'✅ موافق',rejected:'✕ مرفوض'};
 
-  el.innerHTML=[...pending,...done].map(r=>`
+  el.innerHTML=pending.concat(done).map(r=>`
     <div style="background:var(--card);border:1px solid ${r.status==='pending'?'rgba(168,85,247,.3)':'var(--border)'};border-radius:11px;padding:13px 15px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:34px;height:34px;border-radius:9px;background:${r.techColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0;">${r.techShort}</div>
@@ -7338,7 +7338,7 @@ function initTasksPage(){
   const canAssign=(currentRole==='admin'||currentRole==='manager');
   const mmEntry=canAssign?[]:([{id:13,name:'محمد مهند',short:'مم',color:'#0ea5e9',dept:'إداري',grade:'A+',routingOnly:true}]);
   const assignable=TECHS.filter(t=>t.dept==='فني');
-  const allEntries=[...mmEntry,...assignable];
+  const allEntries=mmEntry.concat(assignable);
 
   const buildHtml=()=>allEntries.map(t=>`
     <div onclick="${t.routingOnly?'toggleTechCheck(13)':isExempt(t.id)?'showTechToast(\'⚠️ '+t.name+' معفى مؤقتاً من المهام\')':'toggleTechCheck('+t.id+')'}" id="tchk-wrap-${t.id}"
@@ -7474,7 +7474,7 @@ function sendTask(){
     };
     tasks.unshift(task);
     sbSave('tasks',task.id,task);
-    const delegateName2=((TECHS.find(t=>t.id===routingDelegateId))||\{\}.name)||'محمد مهند';
+    const delegateName2=((TECHS.find(t=>t.id===routingDelegateId)||{}).name)||'محمد مهند';
     pushAdminAlert((me&&me.name)||'', '📥 مهمة واردة جديدة من '+((me&&me.name)||'')+'  — '+finalType+(subscriber?' — '+subscriber:''));
     playAlert('task_incoming');
     showTechToast('✅ تم الإرسال — بانتظار توجيه '+delegateName2);
@@ -7687,7 +7687,7 @@ function acceptTask(){
     if(!allAccepted){
       // Show waiting status for this tech
       const stillWaiting=pendingTask.teamIds.filter(id=>!pendingTask.teamAccepted[id]);
-      const waitingNames=stillWaiting.map(id=>((TECHS.find(t=>t.id===id))||\{\}.name)||id).join('، ');
+      const waitingNames=stillWaiting.map(id=>((TECHS.find(t=>t.id===id)||{}).name)||id).join('، ');
       pendingTask.status='pending'; // still pending for others
       activeTask=pendingTask;
       pendingTask=null;
@@ -7874,7 +7874,7 @@ function confirmCloseTask(){
   activeTask.zone=(document.getElementById('ctmZone')&&document.getElementById('ctmZone').value)||'';
   sbSave('tasks',activeTask.id,activeTask);
   activeTask.fee=parseFloat((document.getElementById('ctmFee')&&document.getElementById('ctmFee').value))||activeTask.fee||0;
-  activeTask.photos=[...ctmPhotos]; // save photos
+  activeTask.photos=ctmPhotos.slice(); // save photos
   ctmPhotos=[];
   pushAdminAlert(activeTask.techName,'أنهى المهمة: '+activeTask.type+' ('+durStr+') — '+compStatus+(activeTask.photos.length>0?' 📸 '+activeTask.photos.length+' صور':''));
   playAlert('task_done');
@@ -7950,7 +7950,7 @@ function renderPendingGroups(){
         ${tlist.map(t=>{
           const isTeam=t.teamNames&&t.teamNames.length>1;
           return `<div onclick="openTaskDetails(${t.id})" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(14,165,233,.05)'" onmouseout="this.style.background=''">
-            <div style="width:30px;height:30px;border-radius:8px;background:${t.techColor||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0;">${((TECHS.find(x=>x.id===t.techId))||\{\}.short)||'؟'}</div>
+            <div style="width:30px;height:30px;border-radius:8px;background:${t.techColor||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0;">${((TECHS.find(x=>x.id===t.techId)||{}).short)||'؟'}</div>
             <div style="flex:1;min-width:0;">
               ${t.subscriber?`<div style="font-size:14px;font-weight:900;">${t.subscriber}</div><div style="font-size:10px;color:var(--muted);">${t.techName}</div>`:`<div style="font-size:12px;font-weight:700;">${t.techName}</div>`}
               <div style="font-size:10px;color:var(--muted);">${t.desc||''} ${t.desc&&t.location?'|':''} 📍 ${t.location}</div>
@@ -8111,7 +8111,7 @@ function renderCompletedTasksGroups(){
         return `<div onclick="openTaskDetails(${t.id})" style="padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(34,197,94,.04)'" onmouseout="this.style.background=''">
           <div style="display:flex;align-items:flex-start;gap:10px;">
             <!-- Avatar -->
-            <div style="width:34px;height:34px;border-radius:9px;background:${t.techColor||'var(--green)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0;">${((TECHS.find(x=>x.id===t.techId))||\{\}.short)||'؟'}</div>
+            <div style="width:34px;height:34px;border-radius:9px;background:${t.techColor||'var(--green)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0;">${((TECHS.find(x=>x.id===t.techId)||{}).short)||'؟'}</div>
             <div style="flex:1;min-width:0;">
               <!-- Top row -->
               <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap;">
@@ -8337,13 +8337,12 @@ function renderChatContacts(){
   // Build contact list: Group + all other users
   const allUsers=[
     {id:'group', name:'الشات العام', short:'💬', color:'#0ea5e9', sub:'الكل'},
-    ...TECHS.filter(t=>t.id!==myId).map(t=>({
+    [].concat(TECHS).filter(t=>t.id!==myId).map(t=>({
       id:t.id, name:t.name, short:t.short, color:t.color,
       sub:t.dept
     })),
     // Add ali$$ if current user is not ali$$
-    ...(currentRole!=='manager'?[{id:'ali$$',name:'ali$$',short:'مد',color:'#f43f5e',sub:'المدير'}]:[]),
-  ];
+  ].concat(currentRole!=='manager'?[{id:'ali$$',name:'ali$$',short:'مد',color:'#f43f5e',sub:'المدير'}]:[]);
 
   el.innerHTML=allUsers.map(u=>{
     const isActive=currentChat===(u.id);
@@ -8707,7 +8706,7 @@ function renderMonthlyTaskReport(){
 
   // Generate 30-day simulated + real data merged
   const allTypes=Object.keys(STANDARDS);
-  const typeList=[...allTypes];
+  const typeList=allTypes.slice();
 
   // Real tasks only
   const realDone=tasks.filter(t=>t.status==='done');
@@ -8792,7 +8791,7 @@ function renderMonthlyTaskReport(){
     ${TECHS.map(t=>{
       const p=teamPerf[t.name];
       const avg=p.tasks>0?Math.floor(p.totalSecs/p.tasks):0;
-      const maxSecs=Math.max(...Object.values(teamPerf).map(x=>x.totalSecs))||1;
+      const maxSecs=Math.max.apply(null,Object.values(teamPerf).map(x=>x.totalSecs))||1;
       const pct=Math.round((p.totalSecs/maxSecs)*100);
       const overall=techOverallRating(p.tasks>0?[Math.min(100,Math.round((avg/(STANDARDS['صيانة']||10800))*80))]: []);
       return `<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;padding:13px 14px;">
@@ -8827,7 +8826,7 @@ function renderMonthlyTaskReport(){
     <div style="display:flex;align-items:flex-end;gap:3px;height:80px;overflow-x:auto;padding-bottom:4px;">
       ${days.map(d=>{
         const cnt=d.realCount;
-        const maxCnt=Math.max(...days.map(x=>x.realCount),1);
+        const maxCnt=Math.max.apply(null,days.map(x=>x.realCount),1);
         const h=maxCnt>0?Math.round((cnt/maxCnt)*72):0;
         const color=d.isToday?'var(--accent)':'rgba(14,165,233,.4)';
         return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:14px;" title="${d.label}: ${cnt} مهمة">
@@ -8850,7 +8849,7 @@ function renderCustomerHistory(query){
   const doneTasks=tasks.filter(t=>t.status==='done');
 
   // Get all unique customer names from task descriptions
-  const allNames=[...new Set(doneTasks.map(t=>t.desc).filter(Boolean))];
+  const allNames=[[].concat(new) Set(doneTasks.map(t=>t.desc).filter(Boolean))];
 
   let html=`
   <!-- Search box -->
@@ -8994,7 +8993,7 @@ function renderFeesReport(){
     if(byDay[ds]){byDay[ds].total+=t.fee;byDay[ds].count++;}
   });
   const days=Object.values(byDay);
-  const maxDay=Math.max(...days.map(d=>d.total),1);
+  const maxDay=Math.max.apply(null,days.map(d=>d.total),1);
 
   el.innerHTML=`
   <!-- Summary cards -->
@@ -9095,7 +9094,7 @@ function loadInventory(){
     const s=localStorage.getItem('slt_inventory');
     if(s) Object.assign(inventory, JSON.parse(s));
     const h=localStorage.getItem('slt_inv_history');
-    if(h) invHistory.push(...JSON.parse(h));
+    if(h) invHistory.push([].concat(JSON).parse(h));
   }catch(e){}
 }
 loadInventory();
@@ -9294,12 +9293,12 @@ function submitDelivery(){
   if(!hasAny){showTechToast('⚠️ أدخل كمية واحدة على الأقل');return;}
 
   const note=(document.getElementById('dlv_note')&&document.getElementById('dlv_note').value).trim()||'';
-  const techNames=selectedDeliveryTechs.map(id=>((TECHS.find(t=>t.id===id))||\{\}.name)||id);
+  const techNames=selectedDeliveryTechs.map(id=>((TECHS.find(t=>t.id===id)||{}).name)||id);
   const dlv={
     id:Date.now(),
     date:new Date().toLocaleDateString('ar-IQ'),
     time:new Date(),
-    techIds:[...selectedDeliveryTechs],
+    techIds:selectedDeliveryTechs.slice(),
     techNames,
     materials:mats,
     note,
@@ -9462,7 +9461,7 @@ function renderDeliverySummary(){
     });
   });
 
-  const techIds=[...new Set([...Object.keys(delivered),...Object.keys(used)].map(Number))];
+  const techIds=[[].concat(new) Set([[].concat(Object).keys(delivered).concat(Object.keys(used))].map(Number))];
 
   if(techIds.length===0){
     el.innerHTML=`<div style="text-align:center;padding:18px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:12px;">لا توجد بيانات اليوم</div>`;
@@ -9734,7 +9733,7 @@ function filterCabZone(zone){
     <!-- Task header -->
     <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div style="width:30px;height:30px;border-radius:8px;background:${t.techColor||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;flex-shrink:0;">
-        ${((TECHS.find(x=>x.id===t.techId))||\{\}.short)||'؟'}
+        ${((TECHS.find(x=>x.id===t.techId)||{}).short)||'؟'}
       </div>
       <div style="flex:1;">
         <div style="font-size:12px;font-weight:800;">${t.subscriber||t.desc} — ${t.type}</div>
