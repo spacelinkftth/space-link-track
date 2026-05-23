@@ -2313,7 +2313,7 @@ const SUPERVISOR_IDS=[21,22,23,24,25,26,27];
 const DELIVERY_IDS=[12]; // ستار (id12)
 
 function canDelivery(){
-  return currentRole==='admin'||currentRole==='manager'||DELIVERY_IDS.includes(me?.id);
+  return currentRole==='admin'||currentRole==='manager'||DELIVERY_IDS.includes((me&&me.id));
 } // A1-A5 = خريطة + مهام + لا يرد
 const VIEWER_IDS=[]; // no more viewers
 let currentRole='tech'; // 'admin' | 'manager' | 'viewer' | 'tech'
@@ -2508,7 +2508,7 @@ function pickTech(){
   e.style.cssText='display:block;background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.2);color:var(--text);';
 }
 function beginShift(){
-  const v=document.getElementById('tSel')?.value;
+  const v=(document.getElementById('tSel')&&document.getElementById('tSel').value);
   if(!v){alert('اختر اسمك أولاً');return;}
   const tech=TECHS.find(t=>t.id==v);
   if(!tech) return;
@@ -2692,7 +2692,7 @@ function tickShift(){
   elapsed++;
 
   // Check auto-logout based on custom shift end time + 30 min grace
-  const customShift=window._customShifts?.[me?.id];
+  const customShift=window.(_customShifts&&_customShifts[(me&&me.id)]);
   if(customShift&&customShift.end){
     const now=new Date();
     const [eh,em]=customShift.end.split(':').map(Number);
@@ -2706,7 +2706,7 @@ function tickShift(){
     if(now>=endToday&&now<graceEnd){
       const remSec=Math.floor((graceEnd-now)/1000);
       if(remSec===1800) playAlert('shift_end'); // warn at exactly 30min
-      document.getElementById('shiftBox')?.classList.add('crit');
+      (document.getElementById('shiftBox')&&document.getElementById('shiftBox').classList).add('crit');
       const rem=remSec;
       document.getElementById('fRem').textContent='⚠️ '+pad(Math.floor(rem/60))+':'+pad(rem%60)+' للخروج';
     } else {
@@ -2998,7 +2998,7 @@ function buildTechPopup(techId){
   const t=activeTechs[techId];
   if(!t) return '';
   const techData=TECHS.find(x=>x.id===techId);
-  const grade=techData?.grade||'';
+  const grade=(techData&&techData.grade)||'';
 
   // Current active task
   const currentTask=tasks.find(tk=>tk.techId===techId&&tk.status==='active');
@@ -3130,7 +3130,7 @@ function renderList(){
     return `<div class="ecard" style="color:${t.color}" id="ec${t.id}" onclick="focusTech(${t.id})">
       <div class="ec-top">
         <div class="ec-av" style="background:${t.color}">${t.short}</div>
-        <div class="ec-info"><div class="ec-name">${t.name} ${gradeBadge(TECHS.find(x=>x.id===t.id)?.grade||'B')}</div><div class="ec-role">فني</div></div>
+        <div class="ec-info"><div class="ec-name">${t.name} ${gradeBadge(((TECHS.find(x=>x.id===t.id))||\{\}.grade)||'B')}</div><div class="ec-role">فني</div></div>
         <div class="ec-badge" style="color:${t.onBreak?'var(--amber)':t.color}">${t.onBreak?'☕ استراحة':'✅ نشط'}</div>
       </div>
       ${t.onBreak?`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;">
@@ -3153,7 +3153,7 @@ function focusTech(id){
   if(!adminMap||!activeTechs[id]||!activeTechs[id].active) return;
   adminMap.setView([activeTechs[id].lat,activeTechs[id].lng],16,{animate:true});
   if(activeTechs[id].mark){
-    activeTechs[id].mark.getPopup()?.setContent(buildTechPopup(id));
+    activeTechs[id].mark.getPopup()&&setContent(buildTechPopup(id));
     activeTechs[id].mark.openPopup();
   }
   document.querySelectorAll('.ecard').forEach(c=>c.style.outline='none');
@@ -3267,7 +3267,7 @@ function initMonthly(){
 
 function renderMonthly(){
   if(!monthlyData) return;
-  const techFilter=document.getElementById('monthTechSel')?.value||'all';
+  const techFilter=(document.getElementById('monthTechSel')&&document.getElementById('monthTechSel').value)||'all';
   let rows=monthlyData.filter(r=>!r.isFuture);
   if(techFilter!=='all') rows=rows.filter(r=>r.name===techFilter);
 
@@ -3645,7 +3645,7 @@ let hrTab='daily';
 // Called when tech logs in — auto-record attendance
 function hrRecordLogin(techId, loginTime){
   const shift=SHIFTS[techId];
-  const customShift=window._customShifts?.[techId];
+  const customShift=window.(_customShifts&&_customShifts[techId]);
   const shiftData=customShift||shift;
   if(!shiftData) return;
   const today=loginTime.toLocaleDateString('ar-IQ');
@@ -3657,7 +3657,7 @@ function hrRecordLogin(techId, loginTime){
   const lateMin=Math.max(0,loginMin-startMin);
   hrAttendance.push({
     techId,
-    name:shiftData.name||TECHS.find(t=>t.id===techId)?.name||'',
+    name:shiftData.name||((TECHS.find(t=>t.id===techId))||\{\}.name)||'',
     date:today,
     loginTime:fmtHM(loginTime),
     logoutTime:'—',
@@ -3851,7 +3851,7 @@ function renderHRMonthly(){
   const techSummary={};
   TECHS.forEach(t=>{
     const shift=SHIFTS[t.id];
-    techSummary[t.id]={tech:t,present:0,absent:0,late:0,leave:0,totalLateMin:0,shiftHours:shift?.hours||12};
+    techSummary[t.id]={tech:t,present:0,absent:0,late:0,leave:0,totalLateMin:0,shiftHours:(shift&&shift.hours)||12};
   });
   // Real attendance data only
   hrAttendance.forEach(r=>{
@@ -3925,7 +3925,7 @@ function renderHRFinal(){
         <div style="width:44px;height:44px;border-radius:12px;background:${t.color};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;">${t.short}</div>
         <div style="flex:1;">
           <div style="font-size:15px;font-weight:900;display:flex;align-items:center;gap:8px;">${t.name} ${gradeBadge(t.grade||'B')}</div>
-          <div style="font-size:11px;color:var(--muted);">نوبة: ${shift?shift.start+' — '+shift.end:' —'} &nbsp;|&nbsp; ${shift?.hours||12} ساعة</div>
+          <div style="font-size:11px;color:var(--muted);">نوبة: ${shift?shift.start+' — '+shift.end:' —'} &nbsp;|&nbsp; ${(shift&&shift.hours)||12} ساعة</div>
         </div>
         <div style="text-align:center;background:${overall.color||gc}18;border:1px solid ${overall.color||gc}44;border-radius:10px;padding:8px 14px;">
           <div style="font-size:22px;">${overall.star||'—'}</div>
@@ -4172,7 +4172,7 @@ function initSalaryPage(){
       lbl.id='salaryFilterLabel';
       lbl.style.cssText='font-size:11px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.15);border-radius:8px;';
       lbl.textContent='💰 عرض راتبك الشخصي فقط';
-      fsel?.parentNode?.insertBefore(lbl,fsel);
+      (fsel&&fsel.parentNode)&&insertBefore(lbl,fsel);
     }
     renderSalaryTable();
     return;
@@ -4192,7 +4192,7 @@ function initSalaryPage(){
     });
   }
   // Update balance display when emp changes
-  wdSel?.addEventListener('change',()=>updateWdBalance());
+  (wdSel&&wdSel.addEventListener)('change',()=>updateWdBalance());
 
   const sel=document.getElementById('dedEmp');
   if(sel&&sel.options.length===1){
@@ -4222,7 +4222,7 @@ function initSalaryPage(){
 }
 
 function updateWdBalance(){
-  const id=parseInt(document.getElementById('wdEmp')?.value);
+  const id=parseInt((document.getElementById('wdEmp')&&document.getElementById('wdEmp').value));
   const el=document.getElementById('wdBalance');
   if(!el||!id) return;
   const base=BASE_SALARY[id]||0;
@@ -4234,9 +4234,9 @@ function updateWdBalance(){
 }
 
 function addWithdrawal(){
-  const id=parseInt(document.getElementById('wdEmp')?.value);
-  const amount=parseInt(document.getElementById('wdAmount')?.value)||0;
-  const note=document.getElementById('wdNote')?.value.trim()||'سحب';
+  const id=parseInt((document.getElementById('wdEmp')&&document.getElementById('wdEmp').value));
+  const amount=parseInt((document.getElementById('wdAmount')&&document.getElementById('wdAmount').value))||0;
+  const note=(document.getElementById('wdNote')&&document.getElementById('wdNote').value).trim()||'سحب';
   if(!id){showTechToast('⚠️ اختر الموظف');return;}
   if(amount<=0){showTechToast('⚠️ أدخل مبلغ صحيح');return;}
 
@@ -4254,7 +4254,7 @@ function addWithdrawal(){
 
   withdrawals.push({
     techId:id,
-    name:tech?.name||'',
+    name:(tech&&tech.name)||'',
     amount,
     note,
     date:new Date(),
@@ -4262,16 +4262,16 @@ function addWithdrawal(){
   });
 
   // Notify tech
-  showSalaryNotification(tech?.name||'', amount, '💵 سحب من الراتب: '+note, balance-amount);
+  showSalaryNotification((tech&&tech.name)||'', amount, '💵 سحب من الراتب: '+note, balance-amount);
   playAlert('deduction_alert');
-  pushAdminAlert(tech?.name||'', `💵 سحب ${iqd(amount)} — ${note}`);
+  pushAdminAlert((tech&&tech.name)||'', `💵 سحب ${iqd(amount)} — ${note}`);
 
   // Reset form
   const amEl=document.getElementById('wdAmount'); if(amEl) amEl.value='';
   const ntEl=document.getElementById('wdNote'); if(ntEl) ntEl.value='';
   updateWdBalance();
   renderSalaryTable();
-  showTechToast(`✅ تم تسجيل السحب: ${iqd(amount)} من ${tech?.name||''}`);
+  showTechToast(`✅ تم تسجيل السحب: ${iqd(amount)} من ${(tech&&tech.name)||''}`);
 }
 
 function addDeduction(){
@@ -4313,7 +4313,7 @@ function renderSalaryTable(){
     allDedForms.forEach(d=>{if(d.id!=='salaryTable')d.style.display='none';});
   }
 
-  const filterVal=(currentRole==='viewer'&&me)?String(me.id):(document.getElementById('salaryFilter')?.value||'all');
+  const filterVal=(currentRole==='viewer'&&me)?String(me.id):((document.getElementById('salaryFilter')&&document.getElementById('salaryFilter').value)||'all');
 
   if(filterVal!=='all'){
     const techId=parseInt(filterVal);
@@ -5019,11 +5019,11 @@ function saveAvatars(){
 }
 
 function openAvatarUpload(){
-  document.getElementById('avatarInput')?.click();
+  (document.getElementById('avatarInput')&&document.getElementById('avatarInput').click)();
 }
 
 function handleAvatarUpload(event){
-  const file=event.target.files?.[0];
+  const file=event.target.(files&&files[0]);
   if(!file||!me) return;
   const reader=new FileReader();
   reader.onload=e=>{
@@ -5059,7 +5059,7 @@ function updateTechAvatar(techId){
     }
   }
   // Update admin map marker if exists
-  if(activeTechs[techId]?.mark){
+  if((activeTechs[techId]&&activeTechs[techId].mark)){
     const photo=avatarStore[techId];
     const html=photo
       ?`<div style="width:36px;height:36px;border-radius:50%;border:3px solid ${tech.color};overflow:hidden;box-shadow:0 2px 8px ${tech.color}66;"><img src="${photo}" style="width:100%;height:100%;object-fit:cover;"></div>`
@@ -5166,7 +5166,7 @@ function loadUserPermissions(){
     <div style="text-align:center;padding:20px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:11px;">
       <div style="font-size:28px;margin-bottom:8px;">🔒</div>
       <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:4px;">عذراً — حساب الأدمن مقفل</div>
-      <div style="font-size:11px;color:var(--muted);">لا يمكن تغيير صلاحيات ${tech?.name||'هذا الحساب'}</div>
+      <div style="font-size:11px;color:var(--muted);">لا يمكن تغيير صلاحيات ${(tech&&tech.name)||'هذا الحساب'}</div>
     </div>`;
     return;
   }
@@ -5205,7 +5205,7 @@ function togglePerm(techId, key){
 
 function saveUserPermissions(){
   const sel=document.getElementById('permUserSel');
-  const techId=parseInt(sel?.value);
+  const techId=parseInt((sel&&sel.value));
   if(ADMIN_IDS.includes(techId)){
     alert('🔒 عذراً — حساب الأدمن مقفل، لا يمكن تغيير صلاحياته');
     return;
@@ -5243,7 +5243,7 @@ function openShiftEditModal(){
 
   list.innerHTML=TECHS.map(t=>{
     // Get current shift — saved > custom > default SHIFTS
-    const cur=savedShifts[t.id]||window._customShifts?.[t.id]||SHIFTS[t.id]||{start:'12:00',end:'00:00'};
+    const cur=savedShifts[t.id]||window.(_customShifts&&_customShifts[t.id])||SHIFTS[t.id]||{start:'12:00',end:'00:00'};
     return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:11px 14px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
         <div style="width:28px;height:28px;border-radius:7px;background:${t.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0;">${t.short}</div>
@@ -5274,8 +5274,8 @@ function saveShiftEdits(){
 
   let changed=0;
   TECHS.forEach(t=>{
-    const s=document.getElementById('se_start_'+t.id)?.value;
-    const e=document.getElementById('se_end_'+t.id)?.value;
+    const el_s=document.getElementById('se_start_'+t.id);const s=el_s&&el_s.value;
+    const el_e=document.getElementById('se_end_'+t.id);const e=el_e&&el_e.value;
     if(s&&e){
       savedShifts[t.id]={start:s,end:e};
       if(!window._customShifts) window._customShifts={};
@@ -5291,7 +5291,7 @@ function saveShiftEdits(){
 
 function resetEmpShift(techId){
   const tech=TECHS.find(t=>t.id===techId);
-  if(!confirm(`إعادة تعيين وقت دوام ${tech?.name||techId}؟\nسيُطلب منه تحديد وقته في تسجيل الدخول القادم.`)) return;
+  if(!confirm(`إعادة تعيين وقت دوام ${(tech&&tech.name)||techId}؟\nسيُطلب منه تحديد وقته في تسجيل الدخول القادم.`)) return;
   try{
     const saved=JSON.parse(localStorage.getItem('slt_shifts')||'{}');
     delete saved[techId];
@@ -5300,7 +5300,7 @@ function resetEmpShift(techId){
   }catch(e){}
   // Refresh the modal
   openShiftEditModal();
-  showTechToast(`✅ تم إعادة تعيين وقت ${tech?.name||techId}`);
+  showTechToast(`✅ تم إعادة تعيين وقت ${(tech&&tech.name)||techId}`);
 }
 
 // ══════════════════════════════
@@ -5348,7 +5348,7 @@ function addExemption(){
   exemptions.push({
     id:Date.now(),
     techId:id,
-    techName:tech?.name||id,
+    techName:(tech&&tech.name)||id,
     from,to,
     reason:reason||'عمل خارجي',
     active:true,
@@ -5359,8 +5359,8 @@ function addExemption(){
   document.getElementById('exemptReason').value='';
   renderExemptList();
   // Notify tech
-  pushAdminAlert(tech?.name||'', '🚫 تم إعفاؤك مؤقتاً من المهام حتى '+new Date(to).toLocaleString('ar-IQ'));
-  showTechToast('✅ تم تطبيق الإعفاء على '+tech?.name);
+  pushAdminAlert((tech&&tech.name)||'', '🚫 تم إعفاؤك مؤقتاً من المهام حتى '+new Date(to).toLocaleString('ar-IQ'));
+  showTechToast('✅ تم تطبيق الإعفاء على '+(tech&&tech.name));
 }
 
 function removeExemption(eid){
@@ -5385,7 +5385,7 @@ function renderExemptList(){
     const isNow=new Date(e.from)<=now&&new Date(e.to)>=now;
     return `<div style="background:${isNow?'rgba(239,68,68,.06)':'var(--s1)'};border:1px solid ${isNow?'rgba(239,68,68,.2)':'var(--border)'};border-radius:9px;padding:10px 12px;margin-bottom:7px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-        <div style="width:26px;height:26px;border-radius:7px;background:${tech?.color||'#6b7280'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;">${tech?.short||'؟'}</div>
+        <div style="width:26px;height:26px;border-radius:7px;background:${(tech&&tech.color)||'#6b7280'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;">${(tech&&tech.short)||'؟'}</div>
         <span style="font-size:12px;font-weight:700;flex:1;">${e.techName}</span>
         <span style="font-size:10px;padding:2px 7px;border-radius:20px;background:${isNow?'rgba(239,68,68,.1)':'rgba(14,165,233,.1)'};color:${isNow?'var(--red)':'var(--muted)'};">${isNow?'🚫 الآن':'⏳ قادم'}</span>
         <button onclick="removeExemption(${e.id})" style="padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:10px;cursor:pointer;font-family:Cairo;">إلغاء</button>
@@ -5517,8 +5517,8 @@ function renderAlertLiveList(){
     const tech=TECHS.find(t=>t.id===id);
     const resp=_activeAlert.responses[id];
     return `<div style="display:flex;align-items:center;gap:7px;padding:5px 7px;background:var(--s1);border-radius:7px;">
-      <div style="width:22px;height:22px;border-radius:6px;background:${tech?.color||'#6b7280'};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;">${tech?.short||'؟'}</div>
-      <span style="flex:1;font-size:11px;font-weight:600;">${tech?.name||id}</span>
+      <div style="width:22px;height:22px;border-radius:6px;background:${(tech&&tech.color)||'#6b7280'};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;">${(tech&&tech.short)||'؟'}</div>
+      <span style="flex:1;font-size:11px;font-weight:600;">${(tech&&tech.name)||id}</span>
       <span style="font-size:12px;">${resp?'✅':'⏳'}</span>
     </div>`;
   }).join('');
@@ -5548,9 +5548,9 @@ function showAlertResults(alertId){
       </div>
     </div>
     ${responded.length>0?`<div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:6px;">✅ ردّوا:</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${responded.map(id=>{const t=TECHS.find(x=>x.id===id);return `<span style="padding:3px 10px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:20px;font-size:11px;font-weight:700;color:var(--green);">${t?.name||id}</span>`;}).join('')}</div>`:''}
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${responded.map(id=>{const t=TECHS.find(x=>x.id===id);return `<span style="padding:3px 10px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:20px;font-size:11px;font-weight:700;color:var(--green);">${(t&&t.name)||id}</span>`;}).join('')}</div>`:''}
     ${missed.length>0?`<div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:6px;">❌ لم يردوا:</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${missed.map(id=>{const t=TECHS.find(x=>x.id===id);return `<span style="padding:3px 10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;font-size:11px;font-weight:700;color:var(--red);">${t?.name||id}</span>`;}).join('')}</div>`:''}
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${missed.map(id=>{const t=TECHS.find(x=>x.id===id);return `<span style="padding:3px 10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;font-size:11px;font-weight:700;color:var(--red);">${(t&&t.name)||id}</span>`;}).join('')}</div>`:''}
     <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;padding:9px;background:var(--s1);border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:Cairo;font-size:12px;cursor:pointer;">إغلاق</button>
   </div>`;
   document.body.appendChild(modal);
@@ -5564,7 +5564,7 @@ function startAlertChecker(){
     try{
       const alert=JSON.parse(localStorage.getItem('slt_active_alert')||'null');
       if(!alert||!alert.targets.includes(me.id)) {
-        document.getElementById('attendanceAlertBanner')?.style && (document.getElementById('attendanceAlertBanner').style.display='none');
+        (document.getElementById('attendanceAlertBanner')&&document.getElementById('attendanceAlertBanner').style) && (document.getElementById('attendanceAlertBanner').style.display='none');
         return;
       }
       // Show banner
@@ -5621,7 +5621,7 @@ setInterval(()=>{
 },3000);
 function adminEndBreak(techId){
   const tech=TECHS.find(t=>t.id===techId);
-  if(!confirm('إنهاء استراحة '+tech?.name+'؟')) return;
+  if(!confirm('إنهاء استراحة '+(tech&&tech.name)+'؟')) return;
   try{
     const breaks=JSON.parse(localStorage.getItem('slt_force_end_break')||'[]');
     if(!breaks.includes(String(techId))) breaks.push(String(techId));
@@ -5629,7 +5629,7 @@ function adminEndBreak(techId){
   }catch(e){}
   if(activeTechs[techId]) activeTechs[techId].onBreak=false;
   renderList();
-  showTechToast('✅ تم إرسال أمر إنهاء الاستراحة لـ '+tech?.name);
+  showTechToast('✅ تم إرسال أمر إنهاء الاستراحة لـ '+(tech&&tech.name));
 }
 
 function startBreakForceChecker(){
@@ -5709,9 +5709,9 @@ function endBreak(forced){
   const box=document.getElementById('shiftBox');
   if(box) box.style.background='';
   if(!forced&&breakElapsed>0&&breakElapsed<BREAK_DURATION){
-    pushAdminAlert(me?.name||'','↩️ أنهى الاستراحة مبكراً ('+(Math.floor(breakElapsed/60))+' دقيقة)');
+    pushAdminAlert((me&&me.name)||'','↩️ أنهى الاستراحة مبكراً ('+(Math.floor(breakElapsed/60))+' دقيقة)');
   } else if(forced){
-    pushAdminAlert(me?.name||'','⛔ تم إنهاء الاستراحة من الأدمن');
+    pushAdminAlert((me&&me.name)||'','⛔ تم إنهاء الاستراحة من الأدمن');
   }
   breakElapsed=0;
 }
@@ -5986,7 +5986,7 @@ function forceLogoutAll(techId){
     delete sessions[techId];
     localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
   }catch(e){}
-  document.getElementById('sessionsPopup')?.remove();
+  (document.getElementById('sessionsPopup')&&document.getElementById('sessionsPopup').remove)();
   renderSessionBadge();
   showTechToast('✅ تم تصفير جميع جلسات الموظف');
 }
@@ -6029,8 +6029,8 @@ function doForceLogout(){
   }catch(e){}
   const tech=TECHS.find(t=>t.id==id);
   document.getElementById('forceLogoutModal').classList.remove('open');
-  showTechToast(`✅ تم تصفير جلسة ${tech?.name||id}`);
-  pushAdminAlert(tech?.name||id,'🚪 تم تصفير الجلسة من الأدمن');
+  showTechToast(`✅ تم تصفير جلسة ${(tech&&tech.name)||id}`);
+  pushAdminAlert((tech&&tech.name)||id,'🚪 تم تصفير الجلسة من الأدمن');
 }
 
 // Check if forced logout every 10s
@@ -6072,7 +6072,7 @@ function showTechLoadPopup(){
   const existing=document.getElementById('techLoadPopup');
   if(existing){existing.remove();return;}
 
-  const activeTechIds=Object.keys(activeTechs).filter(id=>activeTechs[id]?.active).map(Number);
+  const activeTechIds=Object.keys(activeTechs).filter(id=>(activeTechs[id]&&activeTechs[id].active)).map(Number);
 
   const modal=document.createElement('div');
   modal.id='techLoadPopup';
@@ -6131,7 +6131,7 @@ function showTechLoadPopup(){
 }
 
 function selectTechFromLoad(id){
-  document.getElementById('techLoadPopup')?.remove();
+  (document.getElementById('techLoadPopup')&&document.getElementById('techLoadPopup').remove)();
   // Check the tech checkbox
   const box=document.getElementById('tchk-'+id);
   const wrap=document.getElementById('tchk-wrap-'+id);
@@ -6147,7 +6147,7 @@ const UNASSIGNED_LABEL='📥 واردة — بانتظار التوجيه';
 function renderIncomingTasks(){
   const el=document.getElementById('incomingTasksList');
   if(!el) return;
-  const incoming=tasks.filter(t=>t.status==='pending'&&(!t.techId||t.techId===0)&&t.createdBy&&t.createdBy!=='الأدمن'&&t.createdBy!==me?.name);
+  const incoming=tasks.filter(t=>t.status==='pending'&&(!t.techId||t.techId===0)&&t.createdBy&&t.createdBy!=='الأدمن'&&t.createdBy!==(me&&me.name));
   if(incoming.length===0){
     el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">لا توجد مهام واردة بانتظار التوجيه</div>`;
     return;
@@ -6216,7 +6216,7 @@ function sendIncomingTask(taskId){
   t.teamAccepted={};
   t.teamIds.forEach(id=>{t.teamAccepted[id]=null;});
   t.isTeamTask=selectedTechs.length>1;
-  t.assignedBy=me?.name||'الأدمن';
+  t.assignedBy=(me&&me.name)||'الأدمن';
   // Notify
   selectedTechs.forEach(tech=>{
     pushAdminAlert(tech.name,'تم توجيه مهمة: '+t.type+(t.subscriber?' — '+t.subscriber:''));
@@ -6259,9 +6259,9 @@ function showArchiveModal(){
               <span style="font-size:10px;color:var(--muted);">${new Date(arch.archivedAt).toLocaleDateString('ar-IQ')}</span>
             </div>
             <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);">
-              <span>✅ ${arch.tasks?.length||0} مهمة</span>
-              <span>👥 ${arch.attendance?.length||0} حضور</span>
-              <span>📦 ${arch.deliveries?.length||0} تسليم</span>
+              <span>✅ ${arch.(tasks&&tasks.length)||0} مهمة</span>
+              <span>👥 ${arch.(attendance&&attendance.length)||0} حضور</span>
+              <span>📦 ${arch.(deliveries&&deliveries.length)||0} تسليم</span>
             </div>
           </div>`;
         }).join('')}
@@ -6462,10 +6462,10 @@ function selectLeaveReqType(t){
 function submitLeaveRequest(){
   const type=document.getElementById('leaveReqType').value;
   const date=document.getElementById('leaveReqDate').value;
-  const dateTo=document.getElementById('leaveReqDateTo')?.value||date;
+  const dateTo=(document.getElementById('leaveReqDateTo')&&document.getElementById('leaveReqDateTo').value)||date;
   const note=document.getElementById('leaveReqNote').value.trim();
-  const fromTime=document.getElementById('leaveReqFrom')?.value||'';
-  const toTime=document.getElementById('leaveReqTo')?.value||'';
+  const fromTime=(document.getElementById('leaveReqFrom')&&document.getElementById('leaveReqFrom').value)||'';
+  const toTime=(document.getElementById('leaveReqTo')&&document.getElementById('leaveReqTo').value)||'';
   if(!type){alert('اختر نوع الطلب');return;}
   if(!date){alert('حدد التاريخ');return;}
   if(dateTo&&dateTo<date){alert('تاريخ النهاية يجب أن يكون بعد البداية');return;}
@@ -6807,8 +6807,8 @@ function confirmShiftTime(skip){
     if(saved[tech.id]){s=saved[tech.id].start;e=saved[tech.id].end;}
   }catch(err){}
   // Override with form values if present
-  const formS=document.getElementById('shiftStartTime')?.value;
-  const formE=document.getElementById('shiftEndTime')?.value;
+  const formS=(document.getElementById('shiftStartTime')&&document.getElementById('shiftStartTime').value);
+  const formE=(document.getElementById('shiftEndTime')&&document.getElementById('shiftEndTime').value);
   if(formS) s=formS;
   if(formE) e=formE;
 
@@ -7249,8 +7249,8 @@ function updateScheduleHint(){
 }
 
 function updateDurDisplay(){
-  const h=parseInt(document.getElementById('taskDurHours')?.value)||0;
-  const m=parseInt(document.getElementById('taskDurMins')?.value)||0;
+  const h=parseInt((document.getElementById('taskDurHours')&&document.getElementById('taskDurHours').value))||0;
+  const m=parseInt((document.getElementById('taskDurMins')&&document.getElementById('taskDurMins').value))||0;
   const total=h*60+m;
   const el=document.getElementById('taskDuration'); if(el) el.value=total;
   const disp=document.getElementById('durDisplay');
@@ -7274,7 +7274,7 @@ function changeMat(key, delta){
   const el=document.getElementById('mat_'+key);
   if(el){
     el.textContent=MAT_STORE[key];
-    const row=el.parentElement?.parentElement;
+    const row=el.(parentElement&&parentElement.parentElement);
     if(row) row.style.borderColor=MAT_STORE[key]>0?'rgba(14,165,233,.4)':'var(--border)';
   }
   buildMatsString();
@@ -7294,7 +7294,7 @@ function resetMaterials(){
     const el=document.getElementById('mat_'+k);
     if(el){
       el.textContent='0';
-      const row=el.parentElement?.parentElement;
+      const row=el.(parentElement&&parentElement.parentElement);
       if(row) row.style.borderColor='var(--border)';
     }
   });
@@ -7387,16 +7387,16 @@ function getSelectedTechs(){
 function sendTask(){
   const selectedTechs=getSelectedTechs();
   const type=document.getElementById('taskType').value;
-  const subType=document.getElementById('taskSubType')?.value||'';
-  const subscriber=document.getElementById('taskSubscriber')?.value.trim()||'';
+  const subType=(document.getElementById('taskSubType')&&document.getElementById('taskSubType').value)||'';
+  const subscriber=(document.getElementById('taskSubscriber')&&document.getElementById('taskSubscriber').value).trim()||'';
   const desc=document.getElementById('taskDesc').value.trim();
   const loc=document.getElementById('taskLocation').value.trim();
-  const phone=document.getElementById('taskPhone')?.value.trim()||'';
-  const phone2=document.getElementById('taskPhone2')?.value.trim()||'';
-  const taskTime=document.getElementById('taskTime')?.value||'';
-  const taskEstDur=(parseInt(document.getElementById('taskDurHours')?.value)||0)*60+(parseInt(document.getElementById('taskDurMins')?.value)||0);
+  const phone=(document.getElementById('taskPhone')&&document.getElementById('taskPhone').value).trim()||'';
+  const phone2=(document.getElementById('taskPhone2')&&document.getElementById('taskPhone2').value).trim()||'';
+  const taskTime=(document.getElementById('taskTime')&&document.getElementById('taskTime').value)||'';
+  const taskEstDur=(parseInt((document.getElementById('taskDurHours')&&document.getElementById('taskDurHours').value))||0)*60+(parseInt((document.getElementById('taskDurMins')&&document.getElementById('taskDurMins').value))||0);
   const mats=document.getElementById('taskMaterials').value.trim();
-  const fee=parseFloat(document.getElementById('taskFee')?.value)||0;
+  const fee=parseFloat((document.getElementById('taskFee')&&document.getElementById('taskFee').value))||0;
 
   // Validate type and desc first
   if(!type){alert('اختر نوع المهمة');return;}
@@ -7424,10 +7424,10 @@ function sendTask(){
     deferred.push({
       id:Date.now(),
       type:finalType, desc, subscriber, notes:'',
-      techId:defTechs[0]?.id||null,
+      techId:(defTechs[0]&&defTechs[0].id)||null,
       techName:defTechs.length>0?defTechs.map(x=>x.name).join(' + '):'غير محدد',
-      techColor:defTechs[0]?.color||'#6b7280',
-      techShort:defTechs[0]?.short||'؟',
+      techColor:(defTechs[0]&&defTechs[0].color)||'#6b7280',
+      techShort:(defTechs[0]&&defTechs[0].short)||'؟',
       scheduledAt:schedAt,
       status:'pending',
       createdAt:now,
@@ -7474,8 +7474,8 @@ function sendTask(){
     };
     tasks.unshift(task);
     sbSave('tasks',task.id,task);
-    const delegateName2=TECHS.find(t=>t.id===routingDelegateId)?.name||'محمد مهند';
-    pushAdminAlert(me?.name||'', '📥 مهمة واردة جديدة من '+(me?.name||'')+'  — '+finalType+(subscriber?' — '+subscriber:''));
+    const delegateName2=((TECHS.find(t=>t.id===routingDelegateId))||\{\}.name)||'محمد مهند';
+    pushAdminAlert((me&&me.name)||'', '📥 مهمة واردة جديدة من '+((me&&me.name)||'')+'  — '+finalType+(subscriber?' — '+subscriber:''));
     playAlert('task_incoming');
     showTechToast('✅ تم الإرسال — بانتظار توجيه '+delegateName2);
     document.getElementById('taskDesc').value='';
@@ -7614,12 +7614,12 @@ function initTechNotifications(){
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(14,165,233,.95);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;font-family:Cairo;font-size:12px;direction:rtl;';
     banner.innerHTML = `
       <span style="flex:1;">🔔 فعّل الإشعارات لتصلك المهام حتى لو الصفحة مغلقة</span>
-      <button onclick="requestNotificationPermission();document.getElementById('notifBanner')?.remove()" 
+      <button onclick="requestNotificationPermission();(document.getElementById('notifBanner')&&document.getElementById('notifBanner').remove)()" 
         style="padding:6px 14px;background:#fff;color:#0ea5e9;border:none;border-radius:7px;font-family:Cairo;font-weight:700;cursor:pointer;font-size:12px;">تفعيل</button>
-      <button onclick="document.getElementById('notifBanner')?.remove()" 
+      <button onclick="(document.getElementById('notifBanner')&&document.getElementById('notifBanner').remove)()" 
         style="padding:6px 10px;background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:7px;font-family:Cairo;cursor:pointer;font-size:12px;">لاحقاً</button>`;
     document.body.appendChild(banner);
-    setTimeout(()=>banner?.remove(), 15000);
+    setTimeout(()=>(banner&&banner.remove)(), 15000);
   }
 }
 
@@ -7687,12 +7687,12 @@ function acceptTask(){
     if(!allAccepted){
       // Show waiting status for this tech
       const stillWaiting=pendingTask.teamIds.filter(id=>!pendingTask.teamAccepted[id]);
-      const waitingNames=stillWaiting.map(id=>TECHS.find(t=>t.id===id)?.name||id).join('، ');
+      const waitingNames=stillWaiting.map(id=>((TECHS.find(t=>t.id===id))||\{\}.name)||id).join('، ');
       pendingTask.status='pending'; // still pending for others
       activeTask=pendingTask;
       pendingTask=null;
       taskElapsed=0;
-      pushAdminAlert(me.name, `✅ ${me?.name} قبل المهمة — في انتظار: ${waitingNames}`);
+      pushAdminAlert(me.name, `✅ ${(me&&me.name)} قبل المهمة — في انتظار: ${waitingNames}`);
       renderMyTasks();
       renderActiveTasksList();
       showTechToast(`✅ قبلت المهمة — في انتظار موافقة: ${waitingNames}`);
@@ -7871,9 +7871,9 @@ function confirmCloseTask(){
   activeTask.materials='—';
   activeTask.completionDetails=details;
   activeTask.completionStatus=compStatus;
-  activeTask.zone=document.getElementById('ctmZone')?.value||'';
+  activeTask.zone=(document.getElementById('ctmZone')&&document.getElementById('ctmZone').value)||'';
   sbSave('tasks',activeTask.id,activeTask);
-  activeTask.fee=parseFloat(document.getElementById('ctmFee')?.value)||activeTask.fee||0;
+  activeTask.fee=parseFloat((document.getElementById('ctmFee')&&document.getElementById('ctmFee').value))||activeTask.fee||0;
   activeTask.photos=[...ctmPhotos]; // save photos
   ctmPhotos=[];
   pushAdminAlert(activeTask.techName,'أنهى المهمة: '+activeTask.type+' ('+durStr+') — '+compStatus+(activeTask.photos.length>0?' 📸 '+activeTask.photos.length+' صور':''));
@@ -7950,7 +7950,7 @@ function renderPendingGroups(){
         ${tlist.map(t=>{
           const isTeam=t.teamNames&&t.teamNames.length>1;
           return `<div onclick="openTaskDetails(${t.id})" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(14,165,233,.05)'" onmouseout="this.style.background=''">
-            <div style="width:30px;height:30px;border-radius:8px;background:${t.techColor||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0;">${TECHS.find(x=>x.id===t.techId)?.short||'؟'}</div>
+            <div style="width:30px;height:30px;border-radius:8px;background:${t.techColor||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0;">${((TECHS.find(x=>x.id===t.techId))||\{\}.short)||'؟'}</div>
             <div style="flex:1;min-width:0;">
               ${t.subscriber?`<div style="font-size:14px;font-weight:900;">${t.subscriber}</div><div style="font-size:10px;color:var(--muted);">${t.techName}</div>`:`<div style="font-size:12px;font-weight:700;">${t.techName}</div>`}
               <div style="font-size:10px;color:var(--muted);">${t.desc||''} ${t.desc&&t.location?'|':''} 📍 ${t.location}</div>
@@ -7958,7 +7958,7 @@ function renderPendingGroups(){
               ${t.estimatedDuration>0?`<div style="font-size:10px;color:var(--accent);font-weight:700;">⏱ مدة متوقعة: ${t.estimatedDuration>=60?Math.floor(t.estimatedDuration/60)+'س'+(t.estimatedDuration%60>0?' '+t.estimatedDuration%60+'د':''):t.estimatedDuration+'د'}</div>`:''}
               ${t.materials&&t.materials!=='—'?`<div style="font-size:10px;color:var(--amber);">🧰 ${t.materials}</div>`:''}
               <div style="font-size:10px;color:var(--muted);margin-top:2px;">✍️ أنشأها: <span style="color:var(--text);font-weight:600;">${t.createdBy||'الأدمن'}</span></div>
-              ${t.isTeamTask&&t.teamAccepted?`<div style="font-size:10px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${t.teamIds.map(id=>{const tech=TECHS.find(x=>x.id===id);const accepted=t.teamAccepted[id];return `<span style="padding:2px 8px;border-radius:20px;background:${accepted?'rgba(34,197,94,.1)':'rgba(245,158,11,.1)'};border:1px solid ${accepted?'rgba(34,197,94,.3)':'rgba(245,158,11,.3)'};color:${accepted?'var(--green)':'var(--amber)'};">${tech?.name||id} ${accepted?'✅':'⏳'}</span>`;}).join('')}</div>`:''}
+              ${t.isTeamTask&&t.teamAccepted?`<div style="font-size:10px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${t.teamIds.map(id=>{const tech=TECHS.find(x=>x.id===id);const accepted=t.teamAccepted[id];return `<span style="padding:2px 8px;border-radius:20px;background:${accepted?'rgba(34,197,94,.1)':'rgba(245,158,11,.1)'};border:1px solid ${accepted?'rgba(34,197,94,.3)':'rgba(245,158,11,.3)'};color:${accepted?'var(--green)':'var(--amber)'};">${(tech&&tech.name)||id} ${accepted?'✅':'⏳'}</span>`;}).join('')}</div>`:''}
 
             </div>
             <div style="font-size:10px;color:var(--amber);flex-shrink:0;">⏰ ${fmtHM(t.sentAt)}</div>
@@ -8111,7 +8111,7 @@ function renderCompletedTasksGroups(){
         return `<div onclick="openTaskDetails(${t.id})" style="padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(34,197,94,.04)'" onmouseout="this.style.background=''">
           <div style="display:flex;align-items:flex-start;gap:10px;">
             <!-- Avatar -->
-            <div style="width:34px;height:34px;border-radius:9px;background:${t.techColor||'var(--green)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0;">${TECHS.find(x=>x.id===t.techId)?.short||'؟'}</div>
+            <div style="width:34px;height:34px;border-radius:9px;background:${t.techColor||'var(--green)'};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;flex-shrink:0;">${((TECHS.find(x=>x.id===t.techId))||\{\}.short)||'؟'}</div>
             <div style="flex:1;min-width:0;">
               <!-- Top row -->
               <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap;">
@@ -8201,7 +8201,7 @@ function saveEditTask(){
   t.location=document.getElementById('editTaskLocation').value.trim();
   t.materials=document.getElementById('editTaskMaterials').value.trim()||'—';
   t.fee=parseFloat(document.getElementById('editTaskFee').value)||0;
-  t.taskTime=document.getElementById('editTaskTime')?.value||'';
+  t.taskTime=(document.getElementById('editTaskTime')&&document.getElementById('editTaskTime').value)||'';
   document.getElementById('editTaskModal').classList.remove('open');
   renderActiveTasksList();
   renderCompletedTasksGroups();
@@ -8221,7 +8221,7 @@ function openTaskDetails(id){
   document.getElementById('tdSentAt').textContent=fmtHM(t.sentAt);
   document.getElementById('tdDur').textContent=t.estimatedDuration>0?(t.estimatedDuration>=60?Math.floor(t.estimatedDuration/60)+'س'+(t.estimatedDuration%60>0?' '+t.estimatedDuration%60+'د':''):t.estimatedDuration+'د'):'غير محدد';
   document.getElementById('tdFee').textContent=t.fee>0?iqd(t.fee):'—';
-  document.getElementById('tdTech').textContent=t.teamNames?.length>1?t.teamNames.join(' + '):t.techName||'—';
+  document.getElementById('tdTech').textContent=t.(teamNames&&teamNames.length)>1?t.teamNames.join(' + '):t.techName||'—';
   document.getElementById('tdCreator').textContent=t.createdBy||'الأدمن';
   // Phone
   const pw=document.getElementById('tdPhoneWrap');
@@ -8332,7 +8332,7 @@ function initChatContacts(){
 function renderChatContacts(){
   const el=document.getElementById('chatContacts');
   if(!el) return;
-  const myId=me?.id||0;
+  const myId=(me&&me.id)||0;
 
   // Build contact list: Group + all other users
   const allUsers=[
@@ -8372,7 +8372,7 @@ function getDmKey(id1, id2){
 
 function switchChat(targetId){
   currentChat=targetId;
-  const myId=me?.id||0;
+  const myId=(me&&me.id)||0;
 
   // Update header
   const nameEl=document.getElementById('chatAreaName');
@@ -8511,7 +8511,7 @@ function notifyChatToAll(msg){
     techBadge.style.display='block';
   }
   // Push notification for new message
-  if(msg.senderId!==(me?.id||0)){
+  if(msg.senderId!==((me&&me.id)||0)){
     sendPushNotification('💬 '+msg.senderName, msg.text, 'chat-'+msg.id);
   }
 }
@@ -8519,7 +8519,7 @@ function notifyChatToAll(msg){
 function renderChat(){
   const el=document.getElementById('chatMessages');
   if(!el) return;
-  const myId=me?.id||0;
+  const myId=(me&&me.id)||0;
   const isDM=currentChat!=='group';
   const msgs=isDM?(dmMessages[getDmKey(myId,currentChat)]||[]):chatMessages;
 
@@ -8596,7 +8596,7 @@ function renderTechChat(){
     el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--muted);font-size:12px;">لا توجد رسائل</div>`;
     return;
   }
-  const myId=me?.id||0;
+  const myId=(me&&me.id)||0;
   el.innerHTML=chatMessages.map(m=>{
     const isMe=m.senderId===myId;
     return `<div style="display:flex;flex-direction:${isMe?'row-reverse':'row'};gap:7px;align-items:flex-end;margin-bottom:6px;">
@@ -8763,7 +8763,7 @@ function renderMonthlyTaskReport(){
   <!-- ── BY TYPE BREAKDOWN ── -->
   <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;">📋 المهام حسب النوع</div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:22px;">
-    ${typeList.filter(t=>monthTotals[t]?.count>0).map(type=>{
+    ${typeList.filter(t=>(monthTotals[t]&&monthTotals[t].count>0)).map(type=>{
       const d=monthTotals[type];
       const pct=grandTotal>0?Math.round((d.count/grandTotal)*100):0;
       return `<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
@@ -8846,7 +8846,7 @@ function renderCustomerHistory(query){
   const el=document.getElementById('reportCustomer');
   if(!el) return;
 
-  const q=(query||document.getElementById('custSearch')?.value||'').trim().toLowerCase();
+  const q=(query||(document.getElementById('custSearch')&&document.getElementById('custSearch').value)||'').trim().toLowerCase();
   const doneTasks=tasks.filter(t=>t.status==='done');
 
   // Get all unique customer names from task descriptions
@@ -9114,7 +9114,7 @@ function changeInv(key, delta){
 }
 
 function addToInventory(){
-  const note=document.getElementById('inv_note')?.value.trim()||'إضافة مواد';
+  const note=(document.getElementById('inv_note')&&document.getElementById('inv_note').value).trim()||'إضافة مواد';
   let hasAny=false;
   MAT_KEYS.forEach(k=>{if(INV_PENDING[k]>0)hasAny=true;});
   if(!hasAny){showTechToast('⚠️ أدخل كمية واحدة على الأقل');return;}
@@ -9229,7 +9229,7 @@ function changeDlv(key,delta){
   const el=document.getElementById('dlv_'+key);
   if(el){
     el.textContent=DLV_STORE[key];
-    const row=el.parentElement?.parentElement;
+    const row=el.(parentElement&&parentElement.parentElement);
     if(row) row.style.borderColor=DLV_STORE[key]>0?'rgba(14,165,233,.4)':'var(--border)';
   }
 }
@@ -9260,7 +9260,7 @@ function initDeliveryPage(){
     const el=document.getElementById('dlv_'+k);
     if(el){
       el.textContent='0';
-      const row=el.parentElement?.parentElement;
+      const row=el.(parentElement&&parentElement.parentElement);
       if(row) row.style.borderColor='var(--border)';
     }
   });
@@ -9293,8 +9293,8 @@ function submitDelivery(){
   });
   if(!hasAny){showTechToast('⚠️ أدخل كمية واحدة على الأقل');return;}
 
-  const note=document.getElementById('dlv_note')?.value.trim()||'';
-  const techNames=selectedDeliveryTechs.map(id=>TECHS.find(t=>t.id===id)?.name||id);
+  const note=(document.getElementById('dlv_note')&&document.getElementById('dlv_note').value).trim()||'';
+  const techNames=selectedDeliveryTechs.map(id=>((TECHS.find(t=>t.id===id))||\{\}.name)||id);
   const dlv={
     id:Date.now(),
     date:new Date().toLocaleDateString('ar-IQ'),
@@ -9318,7 +9318,7 @@ function submitDelivery(){
     const el=document.getElementById('dlv_'+k);
     if(el){
       el.textContent='0';
-      const row=el.parentElement?.parentElement;
+      const row=el.(parentElement&&parentElement.parentElement);
       if(row) row.style.borderColor='var(--border)';
     }
   });
@@ -9333,7 +9333,7 @@ function submitDelivery(){
 
 function resetTechDelivery(techId){
   const tech=TECHS.find(t=>t.id===techId);
-  if(!confirm(`تصفير رصيد المواد لـ ${tech?.name||techId}؟\nهذا يضيف سجل تصفير ويعيد الرصيد للصفر.`))return;
+  if(!confirm(`تصفير رصيد المواد لـ ${(tech&&tech.name)||techId}؟\nهذا يضيف سجل تصفير ويعيد الرصيد للصفر.`))return;
 
   // Add a "reset" delivery entry that zeroes out the balance
   // We calculate current remaining and add a negative delivery to cancel it
@@ -9373,7 +9373,7 @@ function resetTechDelivery(techId){
     date:todayStr,
     time:new Date(),
     techIds:[techId],
-    techNames:[tech?.name||techId],
+    techNames:[(tech&&tech.name)||techId],
     materials:resetMats,
     note:'🗑️ تصفير الرصيد',
     by:me?me.name:'الأدمن',
@@ -9383,7 +9383,7 @@ function resetTechDelivery(techId){
 
   renderDeliveryLog();
   renderDeliverySummary();
-  showTechToast(`✅ تم تصفير رصيد ${tech?.name||techId}`);
+  showTechToast(`✅ تم تصفير رصيد ${(tech&&tech.name)||techId}`);
 }
 
 function renderDeliveryLog(){
@@ -9482,7 +9482,7 @@ function renderDeliverySummary(){
       <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:${tech.color}12;border-bottom:1px solid var(--border);">
         <div style="width:32px;height:32px;border-radius:9px;background:${tech.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;">${tech.short}</div>
         <span style="font-size:13px;font-weight:800;flex:1;">${tech.name}</span>
-        ${(currentRole==='admin'||currentRole==='manager'||DELIVERY_IDS.includes(me?.id))?`<button onclick="resetTechDelivery(${id})" style="padding:5px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#fca5a5;font-family:Cairo;font-size:11px;font-weight:700;cursor:pointer;">🗑️ تصفير الرصيد</button>`:''}
+        ${(currentRole==='admin'||currentRole==='manager'||DELIVERY_IDS.includes((me&&me.id)))?`<button onclick="resetTechDelivery(${id})" style="padding:5px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#fca5a5;font-family:Cairo;font-size:11px;font-weight:700;cursor:pointer;">🗑️ تصفير الرصيد</button>`:''}
       </div>
       <!-- Materials table -->
       <div style="overflow-x:auto;">
@@ -9698,7 +9698,7 @@ let _cabZoneFilter='';
 function filterCabZone(zone){
   _cabZoneFilter=zone;
   // Update button styles
-  document.getElementById('czAll')?.style && (() => {
+  (document.getElementById('czAll')&&document.getElementById('czAll').style) && (() => {
     document.getElementById('czAll').style.background=zone===''?'rgba(14,165,233,.15)':'var(--s1)';
     document.getElementById('czAll').style.borderColor=zone===''?'var(--accent)':'var(--border)';
     document.getElementById('czAll').style.color=zone===''?'var(--accent)':'var(--muted)';
@@ -9734,7 +9734,7 @@ function filterCabZone(zone){
     <!-- Task header -->
     <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div style="width:30px;height:30px;border-radius:8px;background:${t.techColor||'var(--accent)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;flex-shrink:0;">
-        ${TECHS.find(x=>x.id===t.techId)?.short||'؟'}
+        ${((TECHS.find(x=>x.id===t.techId))||\{\}.short)||'؟'}
       </div>
       <div style="flex:1;">
         <div style="font-size:12px;font-weight:800;">${t.subscriber||t.desc} — ${t.type}</div>
