@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#04111f;--s1:#071828;--card:#0c1e30;
@@ -2544,7 +2545,7 @@ function startShift(tech){
   if(adminMap) addMarkerToAdminMap(me.id);
 
   show('techScreen');
-  setTimeout(()=>{initTechMap();startGPS();checkPendingTaskForTech();renderMyTasks();startTaskPoller();initTechNotifications();renderMyLeaveStatus();startForceLogoutChecker();registerSession(tech.id);initBreakBtn();startBreakForceChecker();startAlertChecker();},150);
+  setTimeout(()=>{initTechMap();startGPS();checkPendingTaskForTech();renderMyTasks();startTaskPoller();initTechNotifications();renderMyLeaveStatus();startForceLogoutChecker();registerSession(tech.id);initBreakBtn();startBreakForceChecker();startAlertChecker();supabaseInit();},150);
   // Poll every 10s for leave status updates
   setInterval(()=>renderMyLeaveStatus(),10000);
   shiftIv=setInterval(tickShift,1000);
@@ -2621,6 +2622,7 @@ function startGPS(){
         if(activeTechs[me.id]){
           activeTechs[me.id].lat=lt;activeTechs[me.id].lng=ln;
           if(activeTechs[me.id].mark)activeTechs[me.id].mark.setLatLng([lt,ln]);
+          sbPushLocation(me.id,activeTechs[me.id]);
         }
         const acc=pos.coords.accuracy?Math.round(pos.coords.accuracy):0;
         setGPS('ok','📍 موقعك محدد'+(acc?' (دقة '+acc+'م)':''));
@@ -2787,6 +2789,9 @@ function startAdmin(){
   checkMonthlyReset();
   if(me) registerSession(me.id);
   setInterval(()=>renderSessionBadge(), 35000);
+  supabaseInit().then(()=>{
+    try{renderPendingGroups();renderActiveTasksList();renderList();}catch(e){}
+  });
   initTaskFormForRole();
   // Show incoming tasks section for admin/manager/delegate
   const inSec=document.getElementById('incomingSection');
@@ -4008,6 +4013,125 @@ function iqd(n){ return n.toLocaleString('ar-IQ')+' د.ع'; }
 // ── SALARY SYSTEM ──
 
 // Base salaries in USD
+// ══════════════════════════════════════
+// SUPABASE CONFIG & SYNC ENGINE
+// ══════════════════════════════════════
+const SUPA_URL='https://jeweqpokufkbtfuwzfoq.supabase.co';
+const SUPA_KEY='sb_publishable_yzkcCBZfY2LLFX7crd8t6g_l0C6n6XU';
+let supa=null;
+function initSupaClient(){
+  if(typeof supabase==='undefined'){setTimeout(initSupaClient,200);return;}
+  supa=supabase.createClient(SUPA_URL,SUPA_KEY);
+}
+initSupaClient();
+
+// ── Save to Supabase ──
+async function sbSave(table,id,data){
+  if(!supa)return;
+  try{
+    await supa.from(table).upsert({id,data,updated_at:new Date().toISOString()},{onConflict:'id'});
+  }catch(e){console.warn('sbSave error',e);}
+}
+async function sbSaveKey(key,data){
+  if(!supa)return;
+  try{
+    await supa.from('app_state').upsert({key,data,updated_at:new Date().toISOString()},{onConflict:'key'});
+  }catch(e){console.warn('sbSaveKey error',e);}
+}
+
+// ── Load from Supabase ──
+async function sbLoad(){
+  if(!supa){setTimeout(sbLoad,500);return;}
+  try{
+    // Tasks
+    const {data:tData}=await supa.from('tasks').select('*').order('id',{ascending:false});
+    if(tData&&tData.length>0){
+      tasks.length=0;
+      tData.forEach(r=>tasks.push(r.data));
+    }
+    // App state keys
+    const keys=['hrAttendance','deliveries','leaveRequests','deductions','withdrawals','bonuses','chatMessages','inventory','invHistory','DLV_STORE_DATA'];
+    const {data:stData}=await supa.from('app_state').select('*').in('key',keys);
+    if(stData){
+      stData.forEach(r=>{
+        if(r.key==='hrAttendance'&&r.data){hrAttendance.length=0;r.data.forEach(x=>hrAttendance.push(x));}
+        if(r.key==='deliveries'&&r.data){deliveries.length=0;r.data.forEach(x=>deliveries.push(x));}
+        if(r.key==='leaveRequests'&&r.data){leaveRequests.length=0;r.data.forEach(x=>leaveRequests.push(x));}
+        if(r.key==='deductions'&&r.data){deductions.length=0;r.data.forEach(x=>deductions.push(x));}
+        if(r.key==='withdrawals'&&r.data){withdrawals.length=0;r.data.forEach(x=>withdrawals.push(x));}
+        if(r.key==='bonuses'&&r.data){bonuses.length=0;r.data.forEach(x=>bonuses.push(x));}
+        if(r.key==='chatMessages'&&r.data){chatMessages.length=0;r.data.forEach(x=>chatMessages.push(x));}
+        if(r.key==='DLV_STORE_DATA'&&r.data){Object.assign(DLV_STORE,r.data);}
+        if(r.key==='inventory'&&r.data){Object.assign(inventory,r.data);}
+      });
+    }
+    // Locations
+    const {data:lData}=await supa.from('locations').select('*');
+    if(lData){
+      lData.forEach(r=>{
+        if(r.data) activeTechs[r.tech_id]=r.data;
+      });
+    }
+  }catch(e){console.warn('sbLoad error',e);}
+}
+
+// ── Realtime subscriptions ──
+function sbSubscribe(){
+  if(!supa)return;
+  // Tasks realtime
+  supa.channel('tasks-changes').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
+    const d=(payload.new&&payload.new.data);
+    if(!d) return;
+    const idx=tasks.findIndex(t=>t.id===d.id);
+    if(payload.eventType==='DELETE'){if(idx>-1)tasks.splice(idx,1);}
+    else if(idx>-1) tasks[idx]=d;
+    else tasks.unshift(d);
+    try{renderPendingGroups();renderActiveTasksList();}catch(e){}
+    try{renderIncomingTasks();}catch(e){}
+  }).subscribe();
+
+  // Locations realtime
+  supa.channel('loc-changes').on('postgres_changes',{event:'*',schema:'public',table:'locations'},payload=>{
+    const d=(payload.new&&payload.new.data);
+    const id=(payload.new&&payload.new.tech_id);
+    if(d&&id) activeTechs[id]=d;
+    try{renderList();}catch(e){}
+  }).subscribe();
+
+  // Chat realtime
+  supa.channel('chat-changes').on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages'},payload=>{
+    const d=(payload.new&&payload.new.data);
+    if(!d) return;
+    if(!chatMessages.find(m=>m.id===d.id)) chatMessages.push(d);
+    try{renderChat();}catch(e){}
+    try{updateChatBadge();}catch(e){}
+  }).subscribe();
+
+  // App state realtime
+  supa.channel('state-changes').on('postgres_changes',{event:'*',schema:'public',table:'app_state'},payload=>{
+    const key=(payload.new&&payload.new.key), d=(payload.new&&payload.new.data);
+    if(!key||!d) return;
+    if(key==='leaveRequests'){leaveRequests.length=0;d.forEach(x=>leaveRequests.push(x));try{renderMyLeaveStatus();renderLeaveRequestsAdmin();}catch(e){}}
+    if(key==='hrAttendance'){hrAttendance.length=0;d.forEach(x=>hrAttendance.push(x));}
+  }).subscribe();
+}
+
+// ── Auto-save triggers (call after mutations) ──
+function sbPushTasks(){sbSaveKey('tasks_bulk',tasks.map(t=>({id:t.id,data:t})));tasks.forEach(t=>sbSave('tasks',t.id,t));}
+function sbPushState(key,arr){sbSaveKey(key,arr);}
+function sbPushLocation(techId,locData){
+  if(!supa)return;
+  try{supa.from('locations').upsert({tech_id:techId,data:locData,updated_at:new Date().toISOString()},{onConflict:'tech_id'});}catch(e){}
+}
+function sbPushChat(msg){sbSave('chat_messages',msg.id,msg);}
+
+// ── Init ──
+async function supabaseInit(){
+  await sbLoad();
+  sbSubscribe();
+  console.log('✅ Supabase connected');
+}
+
 const MAT_KEYS=['fast_green','fast_blue','cable','onu_huawei','onu_tenda','onu_wifi','hook3','hook_deep','bag'];
 const BASE_SALARY={
   1: 600000,  // علي عدنان
@@ -6369,8 +6493,7 @@ function submitLeaveRequest(){
     createdAt:new Date()
   };
   leaveRequests.push(req);
-
-  const dateLabel=dateTo&&dateTo!==date
+  sbSaveKey('leaveRequests',leaveRequests);
     ? new Date(date).toLocaleDateString('ar-IQ')+' — '+new Date(dateTo).toLocaleDateString('ar-IQ')+' ('+days+' أيام)'
     : new Date(date).toLocaleDateString('ar-IQ');
   const timeLabel=timeStr?' ('+timeStr+')':'';
@@ -7350,6 +7473,7 @@ function sendTask(){
       suggestedTechs:realTechs.map(t=>t.id),
     };
     tasks.unshift(task);
+    sbSave('tasks',task.id,task);
     const delegateName2=TECHS.find(t=>t.id===routingDelegateId)?.name||'محمد مهند';
     pushAdminAlert(me?.name||'', '📥 مهمة واردة جديدة من '+(me?.name||'')+'  — '+finalType+(subscriber?' — '+subscriber:''));
     playAlert('task_incoming');
@@ -7748,6 +7872,7 @@ function confirmCloseTask(){
   activeTask.completionDetails=details;
   activeTask.completionStatus=compStatus;
   activeTask.zone=document.getElementById('ctmZone')?.value||'';
+  sbSave('tasks',activeTask.id,activeTask);
   activeTask.fee=parseFloat(document.getElementById('ctmFee')?.value)||activeTask.fee||0;
   activeTask.photos=[...ctmPhotos]; // save photos
   ctmPhotos=[];
@@ -8178,6 +8303,8 @@ function sendVoiceMessage(base64Audio, target){
   if(target==='chat'){
     if(currentChat==='group'){
       chatMessages.push(msg);
+    sbPushChat(msg);
+      sbPushChat(msg);
     } else {
       const key=getDmKey(sender.id, currentChat);
       if(!dmMessages[key]) dmMessages[key]=[];
@@ -8190,6 +8317,7 @@ function sendVoiceMessage(base64Audio, target){
   } else {
     // Tech chat
     chatMessages.push(msg);
+    sbPushChat(msg);
     renderTechChat();
     notifyChatToAll(msg);
   }
