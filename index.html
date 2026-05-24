@@ -2573,13 +2573,7 @@ function startShift(tech){
     since:fmtHM(shiftStart), sinceDate:shiftStart,
     mark:null, active:true
   };
-  // Save to Firebase (retry until ready)
-  var _regTry=0;
-  var _regIv=setInterval(function(){
-    _regTry++;
-    if(window.fbRest){fbSaveLocation(me.id,activeTechs[me.id]);clearInterval(_regIv);}
-    if(_regTry>20) clearInterval(_regIv);
-  },500);
+  // Firebase will save location after init
 
   // HR: auto-record attendance
   hrRecordLogin(me.id, shiftStart);
@@ -2592,7 +2586,19 @@ function startShift(tech){
   if(adminMap) addMarkerToAdminMap(me.id);
 
   show('techScreen');
-  setTimeout(()=>{initTechMap();startGPS();checkPendingTaskForTech();renderMyTasks();startTaskPoller();initTechNotifications();renderMyLeaveStatus();startForceLogoutChecker();registerSession(tech.id);initBreakBtn();startBreakForceChecker();startAlertChecker();firebaseInit();},150);
+  setTimeout(function(){
+    initTechMap();startGPS();checkPendingTaskForTech();renderMyTasks();
+    startTaskPoller();initTechNotifications();renderMyLeaveStatus();
+    startForceLogoutChecker();registerSession(tech.id);initBreakBtn();
+    startBreakForceChecker();startAlertChecker();
+    // Init Firebase then save location
+    firebaseInit(function(){
+      if(me&&activeTechs[me.id]){
+        fbSaveLocation(me.id,activeTechs[me.id]);
+        console.log('✅ Location saved to Firebase');
+      }
+    });
+  },150);
   // Poll every 10s for leave status updates
   setInterval(()=>renderMyLeaveStatus(),10000);
   shiftIv=setInterval(tickShift,1000);
@@ -4185,14 +4191,14 @@ function fbSubscribe(){
 }
 
 // ── Firebase Init ──
-function firebaseInit(){
+function firebaseInit(onReady){
   waitForFirebase(async function(){
     await fbLoad();
     fbSubscribe();
-    // Push current location if already logged in
     if(me&&activeTechs[me.id]){
       fbSaveLocation(me.id,activeTechs[me.id]);
     }
+    if(onReady) onReady();
     console.log('✅ Firebase sync active');
   });
 }
