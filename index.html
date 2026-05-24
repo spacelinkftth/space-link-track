@@ -18,10 +18,14 @@ var FB_AUTH = '';
 // Simple REST API wrapper
 window.fbRest = {
   set: function(path, data){
+    console.log('fbRest.set:', path);
     return fetch(FB_URL+'/'+path+'.json', {
       method:'PUT',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(data)
+    }).then(function(r){
+      console.log('fbRest.set response:', r.status, path);
+      return r;
     }).catch(function(e){console.warn('fbRest.set error',e);});
   },
   get: function(path){
@@ -2574,6 +2578,19 @@ function startShift(tech){
     mark:null, active:true
   };
   // Firebase will save location after init
+  // Also try direct save every second for 30 seconds
+  var _directTry=0;
+  var _directIv=setInterval(function(){
+    _directTry++;
+    if(window.fbRest&&me&&activeTechs[me.id]){
+      var d={id:me.id,name:me.name,color:me.color,short:me.short,
+        lat:activeTechs[me.id].lat,lng:activeTechs[me.id].lng,
+        active:true,since:activeTechs[me.id].since||''};
+      window.fbRest.set('locations/'+me.id,d);
+      clearInterval(_directIv);
+    }
+    if(_directTry>30) clearInterval(_directIv);
+  },1000);
 
   // HR: auto-record attendance
   hrRecordLogin(me.id, shiftStart);
@@ -2676,6 +2693,12 @@ function startGPS(){
           activeTechs[me.id].lat=lt;activeTechs[me.id].lng=ln;
           if(activeTechs[me.id].mark)activeTechs[me.id].mark.setLatLng([lt,ln]);
           sbPushLocation(me.id,activeTechs[me.id]);
+        }
+        // Force save to Firebase REST directly
+        if(window.fbRest&&me){
+          var locData={id:me.id,name:me.name,color:me.color,short:me.short,
+            lat:lt,lng:ln,active:true,since:activeTechs[me.id]?activeTechs[me.id].since:''};
+          window.fbRest.set('locations/'+me.id, locData);
         }
         const acc=pos.coords.accuracy?Math.round(pos.coords.accuracy):0;
         setGPS('ok','📍 موقعك محدد'+(acc?' (دقة '+acc+'م)':''));
