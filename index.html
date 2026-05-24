@@ -3,11 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>SPACE LINK V2</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+// ══════════════════════════════════════
+// FIREBASE CONFIG & SYNC ENGINE
+// ══════════════════════════════════════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, push, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC1NGr6SqMGUgFThN6Xj1Oojjt7s94wdPE",
+  authDomain: "spacelink-2e719.firebaseapp.com",
+  databaseURL: "https://spacelink-2e719-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "spacelink-2e719",
+  storageBucket: "spacelink-2e719.firebasestorage.app",
+  messagingSenderId: "379435388073",
+  appId: "1:379435388073:web:1f9d60dd9826074f246db8"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+window._db = db;
+window._fbRef = ref;
+window._fbSet = set;
+window._fbGet = get;
+window._fbOnValue = onValue;
+window._fbPush = push;
+window._fbUpdate = update;
+window._fbServerTimestamp = serverTimestamp;
+window._fbReady = true;
+console.log("✅ Firebase initialized");
+</script>
+
 <style>
 :root{
   --bg:#04111f;--s1:#071828;--card:#0c1e30;
@@ -2545,7 +2576,7 @@ function startShift(tech){
   if(adminMap) addMarkerToAdminMap(me.id);
 
   show('techScreen');
-  setTimeout(()=>{initTechMap();startGPS();checkPendingTaskForTech();renderMyTasks();startTaskPoller();initTechNotifications();renderMyLeaveStatus();startForceLogoutChecker();registerSession(tech.id);initBreakBtn();startBreakForceChecker();startAlertChecker();supabaseInit();},150);
+  setTimeout(()=>{initTechMap();startGPS();checkPendingTaskForTech();renderMyTasks();startTaskPoller();initTechNotifications();renderMyLeaveStatus();startForceLogoutChecker();registerSession(tech.id);initBreakBtn();startBreakForceChecker();startAlertChecker();firebaseInit();},150);
   // Poll every 10s for leave status updates
   setInterval(()=>renderMyLeaveStatus(),10000);
   shiftIv=setInterval(tickShift,1000);
@@ -2789,9 +2820,7 @@ function startAdmin(){
   checkMonthlyReset();
   if(me) registerSession(me.id);
   setInterval(()=>renderSessionBadge(), 35000);
-  supabaseInit().then(()=>{
-    try{renderPendingGroups();renderActiveTasksList();renderList();}catch(e){}
-  });
+  firebaseInit();
   initTaskFormForRole();
   // Show incoming tasks section for admin/manager/delegate
   const inSec=document.getElementById('incomingSection');
@@ -4014,123 +4043,147 @@ function iqd(n){ return n.toLocaleString('ar-IQ')+' د.ع'; }
 
 // Base salaries in USD
 // ══════════════════════════════════════
-// SUPABASE CONFIG & SYNC ENGINE
+// FIREBASE SYNC ENGINE
 // ══════════════════════════════════════
-const SUPA_URL='https://jeweqpokufkbtfuwzfoq.supabase.co';
-const SUPA_KEY='sb_publishable_yzkcCBZfY2LLFX7crd8t6g_l0C6n6XU';
-let supa=null;
-function initSupaClient(){
-  if(typeof supabase==='undefined'){setTimeout(initSupaClient,200);return;}
-  supa=supabase.createClient(SUPA_URL,SUPA_KEY);
-}
-initSupaClient();
+let db=null;
+let fbReady=false;
 
-// ── Save to Supabase ──
-async function sbSave(table,id,data){
-  if(!supa)return;
-  try{
-    await supa.from(table).upsert({id,data,updated_at:new Date().toISOString()},{onConflict:'id'});
-  }catch(e){console.warn('sbSave error',e);}
-}
-async function sbSaveKey(key,data){
-  if(!supa)return;
-  try{
-    await supa.from('app_state').upsert({key,data,updated_at:new Date().toISOString()},{onConflict:'key'});
-  }catch(e){console.warn('sbSaveKey error',e);}
+function waitForFirebase(cb,tries){
+  tries=tries||0;
+  if(window._fbReady&&window._db){
+    db=window._db;
+    fbReady=true;
+    cb();
+  } else if(tries<30){
+    setTimeout(function(){waitForFirebase(cb,tries+1);},300);
+  } else {
+    console.warn('Firebase not available');
+  }
 }
 
-// ── Load from Supabase ──
-async function sbLoad(){
-  if(!supa){setTimeout(sbLoad,500);return;}
+// ── Save to Firebase ──
+function fbSave(path,data){
+  if(!db) return;
+  try{ window._fbSet(window._fbRef(db,path),data); }catch(e){console.warn('fbSave error',e);}
+}
+
+function fbSaveTask(task){
+  if(!db||!task||!task.id) return;
+  fbSave('tasks/'+task.id, task);
+}
+
+function fbSaveLocation(techId,data){
+  if(!db) return;
+  fbSave('locations/'+techId, data);
+}
+
+function fbSaveState(key,data){
+  if(!db) return;
+  fbSave('state/'+key, data);
+}
+
+function fbSaveChat(msg){
+  if(!db||!msg) return;
+  fbSave('chat/'+msg.id, msg);
+}
+
+// ── Load from Firebase ──
+async function fbLoad(){
+  if(!db) return;
   try{
-    // Tasks
-    const {data:tData}=await supa.from('tasks').select('*').order('id',{ascending:false});
-    if(tData&&tData.length>0){
+    // Load tasks
+    const tSnap=await window._fbGet(window._fbRef(db,'tasks'));
+    if(tSnap.exists()){
+      const tData=tSnap.val();
       tasks.length=0;
-      tData.forEach(r=>tasks.push(r.data));
+      Object.values(tData).sort(function(a,b){return b.id-a.id;}).forEach(function(t){tasks.push(t);});
     }
-    // App state keys
-    const keys=['hrAttendance','deliveries','leaveRequests','deductions','withdrawals','bonuses','chatMessages','inventory','invHistory','DLV_STORE_DATA'];
-    const {data:stData}=await supa.from('app_state').select('*').in('key',keys);
-    if(stData){
-      stData.forEach(r=>{
-        if(r.key==='hrAttendance'&&r.data){hrAttendance.length=0;r.data.forEach(x=>hrAttendance.push(x));}
-        if(r.key==='deliveries'&&r.data){deliveries.length=0;r.data.forEach(x=>deliveries.push(x));}
-        if(r.key==='leaveRequests'&&r.data){leaveRequests.length=0;r.data.forEach(x=>leaveRequests.push(x));}
-        if(r.key==='deductions'&&r.data){deductions.length=0;r.data.forEach(x=>deductions.push(x));}
-        if(r.key==='withdrawals'&&r.data){withdrawals.length=0;r.data.forEach(x=>withdrawals.push(x));}
-        if(r.key==='bonuses'&&r.data){bonuses.length=0;r.data.forEach(x=>bonuses.push(x));}
-        if(r.key==='chatMessages'&&r.data){chatMessages.length=0;r.data.forEach(x=>chatMessages.push(x));}
-        if(r.key==='DLV_STORE_DATA'&&r.data){Object.assign(DLV_STORE,r.data);}
-        if(r.key==='inventory'&&r.data){Object.assign(inventory,r.data);}
-      });
+    // Load state
+    const stateKeys=['hrAttendance','deliveries','leaveRequests','deductions','withdrawals','bonuses','chatMessages','DLV_STORE_DATA','inventory'];
+    for(var i=0;i<stateKeys.length;i++){
+      var key=stateKeys[i];
+      var snap=await window._fbGet(window._fbRef(db,'state/'+key));
+      if(snap.exists()){
+        var val=snap.val();
+        if(key==='hrAttendance'&&val){hrAttendance.length=0;Object.values(val).forEach(function(x){hrAttendance.push(x);});}
+        if(key==='deliveries'&&val){deliveries.length=0;Object.values(val).forEach(function(x){deliveries.push(x);});}
+        if(key==='leaveRequests'&&val){leaveRequests.length=0;Object.values(val).forEach(function(x){leaveRequests.push(x);});}
+        if(key==='deductions'&&val){deductions.length=0;Object.values(val).forEach(function(x){deductions.push(x);});}
+        if(key==='withdrawals'&&val){withdrawals.length=0;Object.values(val).forEach(function(x){withdrawals.push(x);});}
+        if(key==='bonuses'&&val){bonuses.length=0;Object.values(val).forEach(function(x){bonuses.push(x);});}
+        if(key==='chatMessages'&&val){chatMessages.length=0;Object.values(val).forEach(function(x){chatMessages.push(x);});}
+        if(key==='DLV_STORE_DATA'&&val){Object.assign(DLV_STORE,val);}
+        if(key==='inventory'&&val){Object.assign(inventory,val);}
+      }
     }
-    // Locations
-    const {data:lData}=await supa.from('locations').select('*');
-    if(lData){
-      lData.forEach(r=>{
-        if(r.data) activeTechs[r.tech_id]=r.data;
-      });
+    // Load locations
+    var lSnap=await window._fbGet(window._fbRef(db,'locations'));
+    if(lSnap.exists()){
+      var lData=lSnap.val();
+      Object.keys(lData).forEach(function(id){if(lData[id])activeTechs[parseInt(id)]=lData[id];});
     }
-  }catch(e){console.warn('sbLoad error',e);}
+    console.log('✅ Firebase data loaded');
+  }catch(e){console.warn('fbLoad error',e);}
 }
 
 // ── Realtime subscriptions ──
-function sbSubscribe(){
-  if(!supa)return;
+function fbSubscribe(){
+  if(!db) return;
   // Tasks realtime
-  supa.channel('tasks-changes').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},payload=>{
-    const d=(payload.new&&payload.new.data);
-    if(!d) return;
-    const idx=tasks.findIndex(t=>t.id===d.id);
-    if(payload.eventType==='DELETE'){if(idx>-1)tasks.splice(idx,1);}
-    else if(idx>-1) tasks[idx]=d;
-    else tasks.unshift(d);
-    try{renderPendingGroups();renderActiveTasksList();}catch(e){}
+  window._fbOnValue(window._fbRef(db,'tasks'),function(snap){
+    if(!snap.exists()) return;
+    var data=snap.val();
+    var newTasks=Object.values(data).sort(function(a,b){return b.id-a.id;});
+    tasks.length=0;
+    newTasks.forEach(function(t){tasks.push(t);});
+    try{renderPendingGroups();}catch(e){}
+    try{renderActiveTasksList();}catch(e){}
+    try{renderMyTasks();}catch(e){}
     try{renderIncomingTasks();}catch(e){}
-  }).subscribe();
-
+  });
   // Locations realtime
-  supa.channel('loc-changes').on('postgres_changes',{event:'*',schema:'public',table:'locations'},payload=>{
-    const d=(payload.new&&payload.new.data);
-    const id=(payload.new&&payload.new.tech_id);
-    if(d&&id) activeTechs[id]=d;
+  window._fbOnValue(window._fbRef(db,'locations'),function(snap){
+    if(!snap.exists()) return;
+    var data=snap.val();
+    Object.keys(data).forEach(function(id){if(data[id])activeTechs[parseInt(id)]=data[id];});
     try{renderList();}catch(e){}
-  }).subscribe();
-
+  });
   // Chat realtime
-  supa.channel('chat-changes').on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages'},payload=>{
-    const d=(payload.new&&payload.new.data);
-    if(!d) return;
-    if(!chatMessages.find(m=>m.id===d.id)) chatMessages.push(d);
+  window._fbOnValue(window._fbRef(db,'chat'),function(snap){
+    if(!snap.exists()) return;
+    var data=snap.val();
+    var msgs=Object.values(data).sort(function(a,b){return a.id-b.id;});
+    chatMessages.length=0;
+    msgs.forEach(function(m){chatMessages.push(m);});
     try{renderChat();}catch(e){}
     try{updateChatBadge();}catch(e){}
-  }).subscribe();
-
-  // App state realtime
-  supa.channel('state-changes').on('postgres_changes',{event:'*',schema:'public',table:'app_state'},payload=>{
-    const key=(payload.new&&payload.new.key), d=(payload.new&&payload.new.data);
-    if(!key||!d) return;
-    if(key==='leaveRequests'){leaveRequests.length=0;d.forEach(x=>leaveRequests.push(x));try{renderMyLeaveStatus();renderLeaveRequestsAdmin();}catch(e){}}
-    if(key==='hrAttendance'){hrAttendance.length=0;d.forEach(x=>hrAttendance.push(x));}
-  }).subscribe();
+  });
+  // Leave requests realtime
+  window._fbOnValue(window._fbRef(db,'state/leaveRequests'),function(snap){
+    if(!snap.exists()) return;
+    var data=snap.val();
+    leaveRequests.length=0;
+    Object.values(data).forEach(function(x){leaveRequests.push(x);});
+    try{renderMyLeaveStatus();}catch(e){}
+    try{renderLeaveRequestsAdmin();}catch(e){}
+  });
 }
 
-// ── Auto-save triggers (call after mutations) ──
-function sbPushTasks(){sbSaveKey('tasks_bulk',tasks.map(t=>({id:t.id,data:t})));tasks.forEach(t=>sbSave('tasks',t.id,t));}
-function sbPushState(key,arr){sbSaveKey(key,arr);}
-function sbPushLocation(techId,locData){
-  if(!supa)return;
-  try{supa.from('locations').upsert({tech_id:techId,data:locData,updated_at:new Date().toISOString()},{onConflict:'tech_id'});}catch(e){}
+// ── Firebase Init ──
+function firebaseInit(){
+  waitForFirebase(async function(){
+    await fbLoad();
+    fbSubscribe();
+    console.log('✅ Firebase sync active');
+  });
 }
-function sbPushChat(msg){sbSave('chat_messages',msg.id,msg);}
 
-// ── Init ──
-async function supabaseInit(){
-  await sbLoad();
-  sbSubscribe();
-  console.log('✅ Supabase connected');
-}
+// Aliases for backward compat
+function sbSave(t,id,d){fbSave(t+'/'+id,d);}
+function sbSaveKey(k,d){fbSaveState(k,d);}
+function sbPushLocation(id,d){fbSaveLocation(id,d);}
+function sbPushChat(m){fbSaveChat(m);}
+function supabaseInit(){return new Promise(function(resolve){waitForFirebase(async function(){await fbLoad();fbSubscribe();resolve();});});}
 
 const MAT_KEYS=['fast_green','fast_blue','cable','onu_huawei','onu_tenda','onu_wifi','hook3','hook_deep','bag'];
 const BASE_SALARY={
@@ -7474,7 +7527,7 @@ function sendTask(){
       suggestedTechs:realTechs.map(t=>t.id),
     };
     tasks.unshift(task);
-    sbSave('tasks',task.id,task);
+    fbSaveTask(task);
     const delegateName2=((TECHS.find(t=>t.id===routingDelegateId)||{}).name)||'محمد مهند';
     pushAdminAlert((me&&me.name)||'', '📥 مهمة واردة جديدة من '+((me&&me.name)||'')+'  — '+finalType+(subscriber?' — '+subscriber:''));
     playAlert('task_incoming');
@@ -7873,7 +7926,7 @@ function confirmCloseTask(){
   activeTask.completionDetails=details;
   activeTask.completionStatus=compStatus;
   activeTask.zone=(document.getElementById('ctmZone')&&document.getElementById('ctmZone').value)||'';
-  sbSave('tasks',activeTask.id,activeTask);
+  fbSaveTask(activeTask);
   activeTask.fee=parseFloat((document.getElementById('ctmFee')&&document.getElementById('ctmFee').value))||activeTask.fee||0;
   activeTask.photos=ctmPhotos.slice(); // save photos
   ctmPhotos=[];
