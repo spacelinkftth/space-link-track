@@ -8,37 +8,44 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<!-- Firebase Compat SDK -->
+<!-- Firebase REST API - no SDK needed -->
 <script>
-// Firebase will load asynchronously
 window._fbReady = false;
 window._db = null;
-function loadFirebase(){
-  var s1=document.createElement('script');
-  s1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
-  s1.onload=function(){
-    var s2=document.createElement('script');
-    s2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
-    s2.onload=function(){
-      try{
-        if(!firebase.apps.length) firebase.initializeApp({
-          apiKey:"AIzaSyC1NGr6SqMGUgFThN6Xj1Oojjt7s94wdPE",
-          databaseURL:"https://spacelink-2e719-default-rtdb.europe-west1.firebasedatabase.app",
-          projectId:"spacelink-2e719",
-          appId:"1:379435388073:web:1f9d60dd9826074f246db8"
-        });
-        window._db=firebase.database();
-        window._fbReady=true;
-        console.log('✅ Firebase initialized');
-      }catch(e){console.warn('Firebase init failed:',e);}
-    };
-    s2.onerror=function(){console.warn('Firebase database SDK failed to load');};
-    document.head.appendChild(s2);
-  };
-  s1.onerror=function(){console.warn('Firebase app SDK failed to load');};
-  document.head.appendChild(s1);
-}
-loadFirebase();
+var FB_URL = 'https://spacelink-2e719-default-rtdb.europe-west1.firebasedatabase.app';
+var FB_AUTH = '';
+
+// Simple REST API wrapper
+window.fbRest = {
+  set: function(path, data){
+    return fetch(FB_URL+'/'+path+'.json', {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(data)
+    }).catch(function(e){console.warn('fbRest.set error',e);});
+  },
+  get: function(path){
+    return fetch(FB_URL+'/'+path+'.json')
+      .then(function(r){return r.json();})
+      .catch(function(e){console.warn('fbRest.get error',e);return null;});
+  },
+  listen: function(path, cb){
+    // Poll every 3 seconds as SSE alternative
+    var lastData = null;
+    setInterval(function(){
+      fetch(FB_URL+'/'+path+'.json')
+        .then(function(r){return r.json();})
+        .then(function(data){
+          var str=JSON.stringify(data);
+          if(str!==lastData){lastData=str;cb(data);}
+        }).catch(function(){});
+    },3000);
+  }
+};
+
+window._fbReady = true;
+window._db = window.fbRest;
+console.log('✅ Firebase REST initialized');
 </script>
 
 <style>
@@ -2566,6 +2573,13 @@ function startShift(tech){
     since:fmtHM(shiftStart), sinceDate:shiftStart,
     mark:null, active:true
   };
+  // Save to Firebase (retry until ready)
+  var _regTry=0;
+  var _regIv=setInterval(function(){
+    _regTry++;
+    if(window.fbRest){fbSaveLocation(me.id,activeTechs[me.id]);clearInterval(_regIv);}
+    if(_regTry>20) clearInterval(_regIv);
+  },500);
 
   // HR: auto-record attendance
   hrRecordLogin(me.id, shiftStart);
@@ -4052,127 +4066,122 @@ let fbReady=false;
 
 function waitForFirebase(cb,tries){
   tries=tries||0;
-  if(window._fbReady&&window._db){
-    db=window._db;
+  if(window._fbReady&&window.fbRest){
+    db=window.fbRest;
     fbReady=true;
     cb();
-  } else if(tries<30){
-    setTimeout(function(){waitForFirebase(cb,tries+1);},300);
+  } else if(tries<10){
+    setTimeout(function(){waitForFirebase(cb,tries+1);},200);
   } else {
-    console.warn('Firebase not available');
+    // REST always available immediately
+    db=window.fbRest||null;
+    fbReady=true;
+    cb();
   }
 }
 
 // ── Save to Firebase ──
 function fbSave(path,data){
-  if(!db) return;
-  try{ db.ref(path).set(data); }catch(e){console.warn('fbSave error',e);}
+  if(!window.fbRest) return;
+  window.fbRest.set(path,data);
 }
 
 function fbSaveTask(task){
-  if(!db||!task||!task.id) return;
+  if(!task||!task.id) return;
   fbSave('tasks/'+task.id, task);
 }
 
 function fbSaveLocation(techId,data){
-  if(!db) return;
-  fbSave('locations/'+techId, data);
+  // Remove mark (non-serializable)
+  var d=Object.assign({},data);
+  delete d.mark;
+  fbSave('locations/'+techId, d);
 }
 
 function fbSaveState(key,data){
-  if(!db) return;
   fbSave('state/'+key, data);
 }
 
 function fbSaveChat(msg){
-  if(!db||!msg) return;
+  if(!msg) return;
   fbSave('chat/'+msg.id, msg);
 }
 
 // ── Load from Firebase ──
 async function fbLoad(){
-  if(!db) return;
   try{
     // Load tasks
-    var tSnap=await db.ref('tasks').once('value');
-    if(tSnap.exists()){
-      var tData=tSnap.val();
+    var tData=await window.fbRest.get('tasks');
+    if(tData&&typeof tData==='object'){
       tasks.length=0;
-      Object.values(tData).sort(function(a,b){return b.id-a.id;}).forEach(function(t){tasks.push(t);});
+      Object.values(tData).sort(function(a,b){return b.id-a.id;}).forEach(function(t){if(t)tasks.push(t);});
     }
     // Load state keys
     var stateKeys=['hrAttendance','deliveries','leaveRequests','deductions','withdrawals','bonuses','chatMessages','DLV_STORE_DATA','inventory'];
     for(var i=0;i<stateKeys.length;i++){
       var key=stateKeys[i];
-      var snap=await db.ref('state/'+key).once('value');
-      if(snap.exists()){
-        var val=snap.val();
-        if(key==='hrAttendance'&&val){hrAttendance.length=0;Object.values(val).forEach(function(x){hrAttendance.push(x);});}
-        if(key==='deliveries'&&val){deliveries.length=0;Object.values(val).forEach(function(x){deliveries.push(x);});}
-        if(key==='leaveRequests'&&val){leaveRequests.length=0;Object.values(val).forEach(function(x){leaveRequests.push(x);});}
-        if(key==='deductions'&&val){deductions.length=0;Object.values(val).forEach(function(x){deductions.push(x);});}
-        if(key==='withdrawals'&&val){withdrawals.length=0;Object.values(val).forEach(function(x){withdrawals.push(x);});}
-        if(key==='bonuses'&&val){bonuses.length=0;Object.values(val).forEach(function(x){bonuses.push(x);});}
-        if(key==='chatMessages'&&val){chatMessages.length=0;Object.values(val).forEach(function(x){chatMessages.push(x);});}
-        if(key==='DLV_STORE_DATA'&&val){Object.assign(DLV_STORE,val);}
-        if(key==='inventory'&&val){Object.assign(inventory,val);}
+      var val=await window.fbRest.get('state/'+key);
+      if(val&&typeof val==='object'){
+        if(key==='hrAttendance'){hrAttendance.length=0;Object.values(val).forEach(function(x){if(x)hrAttendance.push(x);});}
+        if(key==='deliveries'){deliveries.length=0;Object.values(val).forEach(function(x){if(x)deliveries.push(x);});}
+        if(key==='leaveRequests'){leaveRequests.length=0;Object.values(val).forEach(function(x){if(x)leaveRequests.push(x);});}
+        if(key==='deductions'){deductions.length=0;Object.values(val).forEach(function(x){if(x)deductions.push(x);});}
+        if(key==='withdrawals'){withdrawals.length=0;Object.values(val).forEach(function(x){if(x)withdrawals.push(x);});}
+        if(key==='bonuses'){bonuses.length=0;Object.values(val).forEach(function(x){if(x)bonuses.push(x);});}
+        if(key==='chatMessages'){chatMessages.length=0;Object.values(val).forEach(function(x){if(x)chatMessages.push(x);});}
+        if(key==='DLV_STORE_DATA'){Object.assign(DLV_STORE,val);}
+        if(key==='inventory'){Object.assign(inventory,val);}
       }
     }
     // Load locations
-    var lSnap=await db.ref('locations').once('value');
-    if(lSnap.exists()){
-      var lData=lSnap.val();
+    var lData=await window.fbRest.get('locations');
+    if(lData&&typeof lData==='object'){
       Object.keys(lData).forEach(function(id){if(lData[id])activeTechs[parseInt(id)]=lData[id];});
     }
     console.log('✅ Firebase data loaded');
   }catch(e){console.warn('fbLoad error',e);}
 }
 
-// ── Realtime subscriptions ──
+// ── Realtime polling ──
 function fbSubscribe(){
-  if(!db) return;
-
-  // Tasks realtime
-  db.ref('tasks').on('value',function(snap){
-    if(!snap.exists()) return;
-    var data=snap.val();
-    var newTasks=Object.values(data).sort(function(a,b){return b.id-a.id;});
-    tasks.length=0;
-    newTasks.forEach(function(t){tasks.push(t);});
-    try{renderPendingGroups();}catch(e){}
-    try{renderActiveTasksList();}catch(e){}
-    try{renderMyTasks();}catch(e){}
-    try{renderIncomingTasks();}catch(e){}
-  });
-
-  // Locations realtime
-  db.ref('locations').on('value',function(snap){
-    if(!snap.exists()) return;
-    var data=snap.val();
-    Object.keys(data).forEach(function(id){if(data[id])activeTechs[parseInt(id)]=data[id];});
-    try{renderList();}catch(e){}
-  });
-
-  // Chat realtime
-  db.ref('chat').on('value',function(snap){
-    if(!snap.exists()) return;
-    var data=snap.val();
-    var msgs=Object.values(data).sort(function(a,b){return a.id-b.id;});
-    chatMessages.length=0;
-    msgs.forEach(function(m){chatMessages.push(m);});
-    try{renderChat();}catch(e){}
-    try{updateChatBadge();}catch(e){}
-  });
-
-  // Leave requests realtime
-  db.ref('state/leaveRequests').on('value',function(snap){
-    if(!snap.exists()) return;
-    var data=snap.val();
-    leaveRequests.length=0;
-    Object.values(data).forEach(function(x){leaveRequests.push(x);});
-    try{renderMyLeaveStatus();}catch(e){}
-    try{renderLeaveRequestsAdmin();}catch(e){}
-  });
+  // Poll tasks every 3s
+  var lastTasks='', lastLocs='', lastChat='';
+  setInterval(function(){
+    window.fbRest.get('tasks').then(function(data){
+      if(!data) return;
+      var str=JSON.stringify(data);
+      if(str===lastTasks) return;
+      lastTasks=str;
+      var newTasks=Object.values(data).sort(function(a,b){return b.id-a.id;});
+      tasks.length=0;
+      newTasks.forEach(function(t){if(t)tasks.push(t);});
+      try{renderPendingGroups();}catch(e){}
+      try{renderActiveTasksList();}catch(e){}
+      try{renderMyTasks();}catch(e){}
+      try{renderIncomingTasks();}catch(e){}
+    });
+    // Poll locations every 5s
+    window.fbRest.get('locations').then(function(data){
+      if(!data) return;
+      var str=JSON.stringify(data);
+      if(str===lastLocs) return;
+      lastLocs=str;
+      Object.keys(data).forEach(function(id){if(data[id])activeTechs[parseInt(id)]=data[id];});
+      try{renderList();}catch(e){}
+    });
+    // Poll chat
+    window.fbRest.get('chat').then(function(data){
+      if(!data) return;
+      var str=JSON.stringify(data);
+      if(str===lastChat) return;
+      lastChat=str;
+      var msgs=Object.values(data).sort(function(a,b){return a.id-b.id;});
+      chatMessages.length=0;
+      msgs.forEach(function(m){if(m)chatMessages.push(m);});
+      try{renderChat();}catch(e){}
+      try{updateChatBadge();}catch(e){}
+    });
+  },3000);
 }
 
 // ── Firebase Init ──
@@ -4180,6 +4189,10 @@ function firebaseInit(){
   waitForFirebase(async function(){
     await fbLoad();
     fbSubscribe();
+    // Push current location if already logged in
+    if(me&&activeTechs[me.id]){
+      fbSaveLocation(me.id,activeTechs[me.id]);
+    }
     console.log('✅ Firebase sync active');
   });
 }
