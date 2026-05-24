@@ -8,35 +8,37 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script type="module">
-// ══════════════════════════════════════
-// FIREBASE CONFIG & SYNC ENGINE
-// ══════════════════════════════════════
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, push, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyC1NGr6SqMGUgFThN6Xj1Oojjt7s94wdPE",
-  authDomain: "spacelink-2e719.firebaseapp.com",
-  databaseURL: "https://spacelink-2e719-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "spacelink-2e719",
-  storageBucket: "spacelink-2e719.firebasestorage.app",
-  messagingSenderId: "379435388073",
-  appId: "1:379435388073:web:1f9d60dd9826074f246db8"
-};
-
-const fbApp = initializeApp(firebaseConfig);
-const db = getDatabase(fbApp);
-window._db = db;
-window._fbRef = ref;
-window._fbSet = set;
-window._fbGet = get;
-window._fbOnValue = onValue;
-window._fbPush = push;
-window._fbUpdate = update;
-window._fbServerTimestamp = serverTimestamp;
-window._fbReady = true;
-console.log("✅ Firebase initialized");
+<!-- Firebase Compat SDK -->
+<script>
+// Firebase will load asynchronously
+window._fbReady = false;
+window._db = null;
+function loadFirebase(){
+  var s1=document.createElement('script');
+  s1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+  s1.onload=function(){
+    var s2=document.createElement('script');
+    s2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
+    s2.onload=function(){
+      try{
+        if(!firebase.apps.length) firebase.initializeApp({
+          apiKey:"AIzaSyC1NGr6SqMGUgFThN6Xj1Oojjt7s94wdPE",
+          databaseURL:"https://spacelink-2e719-default-rtdb.europe-west1.firebasedatabase.app",
+          projectId:"spacelink-2e719",
+          appId:"1:379435388073:web:1f9d60dd9826074f246db8"
+        });
+        window._db=firebase.database();
+        window._fbReady=true;
+        console.log('✅ Firebase initialized');
+      }catch(e){console.warn('Firebase init failed:',e);}
+    };
+    s2.onerror=function(){console.warn('Firebase database SDK failed to load');};
+    document.head.appendChild(s2);
+  };
+  s1.onerror=function(){console.warn('Firebase app SDK failed to load');};
+  document.head.appendChild(s1);
+}
+loadFirebase();
 </script>
 
 <style>
@@ -4064,7 +4066,7 @@ function waitForFirebase(cb,tries){
 // ── Save to Firebase ──
 function fbSave(path,data){
   if(!db) return;
-  try{ window._fbSet(window._fbRef(db,path),data); }catch(e){console.warn('fbSave error',e);}
+  try{ db.ref(path).set(data); }catch(e){console.warn('fbSave error',e);}
 }
 
 function fbSaveTask(task){
@@ -4092,17 +4094,17 @@ async function fbLoad(){
   if(!db) return;
   try{
     // Load tasks
-    const tSnap=await window._fbGet(window._fbRef(db,'tasks'));
+    var tSnap=await db.ref('tasks').once('value');
     if(tSnap.exists()){
-      const tData=tSnap.val();
+      var tData=tSnap.val();
       tasks.length=0;
       Object.values(tData).sort(function(a,b){return b.id-a.id;}).forEach(function(t){tasks.push(t);});
     }
-    // Load state
-    const stateKeys=['hrAttendance','deliveries','leaveRequests','deductions','withdrawals','bonuses','chatMessages','DLV_STORE_DATA','inventory'];
+    // Load state keys
+    var stateKeys=['hrAttendance','deliveries','leaveRequests','deductions','withdrawals','bonuses','chatMessages','DLV_STORE_DATA','inventory'];
     for(var i=0;i<stateKeys.length;i++){
       var key=stateKeys[i];
-      var snap=await window._fbGet(window._fbRef(db,'state/'+key));
+      var snap=await db.ref('state/'+key).once('value');
       if(snap.exists()){
         var val=snap.val();
         if(key==='hrAttendance'&&val){hrAttendance.length=0;Object.values(val).forEach(function(x){hrAttendance.push(x);});}
@@ -4117,7 +4119,7 @@ async function fbLoad(){
       }
     }
     // Load locations
-    var lSnap=await window._fbGet(window._fbRef(db,'locations'));
+    var lSnap=await db.ref('locations').once('value');
     if(lSnap.exists()){
       var lData=lSnap.val();
       Object.keys(lData).forEach(function(id){if(lData[id])activeTechs[parseInt(id)]=lData[id];});
@@ -4129,8 +4131,9 @@ async function fbLoad(){
 // ── Realtime subscriptions ──
 function fbSubscribe(){
   if(!db) return;
+
   // Tasks realtime
-  window._fbOnValue(window._fbRef(db,'tasks'),function(snap){
+  db.ref('tasks').on('value',function(snap){
     if(!snap.exists()) return;
     var data=snap.val();
     var newTasks=Object.values(data).sort(function(a,b){return b.id-a.id;});
@@ -4141,15 +4144,17 @@ function fbSubscribe(){
     try{renderMyTasks();}catch(e){}
     try{renderIncomingTasks();}catch(e){}
   });
+
   // Locations realtime
-  window._fbOnValue(window._fbRef(db,'locations'),function(snap){
+  db.ref('locations').on('value',function(snap){
     if(!snap.exists()) return;
     var data=snap.val();
     Object.keys(data).forEach(function(id){if(data[id])activeTechs[parseInt(id)]=data[id];});
     try{renderList();}catch(e){}
   });
+
   // Chat realtime
-  window._fbOnValue(window._fbRef(db,'chat'),function(snap){
+  db.ref('chat').on('value',function(snap){
     if(!snap.exists()) return;
     var data=snap.val();
     var msgs=Object.values(data).sort(function(a,b){return a.id-b.id;});
@@ -4158,8 +4163,9 @@ function fbSubscribe(){
     try{renderChat();}catch(e){}
     try{updateChatBadge();}catch(e){}
   });
+
   // Leave requests realtime
-  window._fbOnValue(window._fbRef(db,'state/leaveRequests'),function(snap){
+  db.ref('state/leaveRequests').on('value',function(snap){
     if(!snap.exists()) return;
     var data=snap.val();
     leaveRequests.length=0;
@@ -4178,7 +4184,7 @@ function firebaseInit(){
   });
 }
 
-// Aliases for backward compat
+// Aliases
 function sbSave(t,id,d){fbSave(t+'/'+id,d);}
 function sbSaveKey(k,d){fbSaveState(k,d);}
 function sbPushLocation(id,d){fbSaveLocation(id,d);}
